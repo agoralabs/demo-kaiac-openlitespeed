@@ -1,0 +1,55 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "ec2-instance-connect:SendSSHPublicKey",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "s3:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "ec2:DescribeInstances",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "ssm:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "ecr:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "ecs:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "logs:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "ssmmessages:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "ec2messages:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "elasticfilesystem:*",
+            "Resource": "*"
+        }
+    ]
+}

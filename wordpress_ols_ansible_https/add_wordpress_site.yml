@@ -1,0 +1,144 @@
+---
+- name: Ajouter un site WordPress à OpenLiteSpeed avec HTTPS
+  hosts: all
+  become: yes
+  vars:
+    php_version: lsphp81
+    web_root: "/var/www/{{ domain_folder }}"
+    vhost_conf: "/usr/local/lsws/conf/vhosts/{{ domain_folder }}/vhconf.conf"
+    httpd_conf: "/usr/local/lsws/conf/httpd_config.conf"
+    email_admin: admin@{{ domain }}
+
+  tasks:
+
+    - name: 🔍 Afficher les variables d'environnement
+      debug:
+        msg:
+          - "DOMAIN = {{ domain }}"
+          - "DOMAIN_FOLDER = {{ domain_folder }}"
+          - "WP_DB_NAME = {{ wp_db_name }}"
+          - "WP_DB_USER = {{ wp_db_user }}"
+          - "WP_DB_PASSWORD = {{ wp_db_password }}"
+          - "WP_DB_HOST = {{ mysql_db_host }}"
+          - "MYSQL_ROOT_USER = {{ mysql_root_user }}"
+          - "MYSQL_ROOT_PASSWORD = {{ mysql_root_password }}"
+
+    - name: Installer PyMySQL (module requis pour Ansible)
+      apt:
+        name: python3-pymysql
+        state: present
+
+
+    - name: Créer le dossier du site
+      file:
+        path: "{{ web_root }}"
+        state: directory
+        owner: nobody
+        group: nogroup
+        mode: '0755'
+
+    - name: Télécharger WordPress
+      get_url:
+        url: https://wordpress.org/latest.tar.gz
+        dest: /tmp/latest.tar.gz
+
+    - name: Extraire WordPress
+      unarchive:
+        src: /tmp/latest.tar.gz
+        dest: "{{ web_root }}"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Déployer le fichier wp-config.php
+      template:
+        src: wp-config.php.j2
+        dest: /var/www/{{ domain_folder }}/wp-config.php
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    # - name: Créer le fichier /root/.my.cnf avec les identifiants MySQL root
+    #   copy:
+    #     dest: /root/.my.cnf
+    #     content: |
+    #       [client]
+    #       user={{ lookup('env', 'MYSQL_ROOT_USER') }}
+    #       password={{ lookup('env', 'MYSQL_ROOT_PASSWORD') }}
+    #     owner: root
+    #     group: root
+    #     mode: '0600'
+
+    - name: Créer la base de données MySQL
+      mysql_db:
+        name: "{{ wp_db_name }}"
+        state: present
+        login_host: "{{ mysql_db_host }}"
+        login_user: "{{ mysql_root_user }}"
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Créer l’utilisateur MySQL sur l’hôte distant
+      mysql_user:
+        name: "{{ wp_db_user }}"
+        password: "{{ wp_db_password }}"
+        priv: "{{ wp_db_name }}.*:ALL"
+        host: "%"
+        state: present
+        login_host: "{{ mysql_db_host }}"
+        login_user: "{{ mysql_root_user }}"
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Vérifier si le listener http80 existe
+      ansible.builtin.shell: |
+        grep -q "listener http80 {" {{ httpd_conf }}
+      register: listener_exists
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Ajouter le listener http80 s'il n'existe pas
+      ansible.builtin.blockinfile:
+        path: "{{ httpd_conf }}"
+        block: |
+          listener http80 {
+            address                 *:80
+            secure                  0
+          }
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - listener http80"
+        insertafter: EOF
+      when: not listener_exists.rc == 0
+    
+    - name: Créer le Virtual Host directory
+      file:
+        path: "/usr/local/lsws/conf/vhosts/{{ domain_folder }}"
+        state: directory
+
+    - name: Générer le fichier de configuration du Virtual Host
+      template:
+        src: vhost_template.conf.j2
+        dest: "{{ vhost_conf }}"
+
+    - name: Ajouter le virtualhost {{ domain_folder }}
+      ansible.builtin.blockinfile:
+        path: "{{ httpd_conf }}"
+        block: |
+          virtualhost {{ domain_folder }} {
+            vhRoot                  /var/www/{{ domain_folder }}
+            configFile              /usr/local/lsws/conf/vhosts/{{ domain_folder }}/vhconf.conf
+            allowSymbolLink         1
+            enableScript            1
+            restrained              0
+          }
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - virtualhost {{ domain_folder }}"
+        insertafter: EOF
+
+    - name: Ajouter ligne 'map' dans listener http80 si absente
+      lineinfile:
+        path: "{{ httpd_conf }}"
+        insertafter: 'listener http80\s*{'
+        regexp: 'map\s+{{ domain_folder }}\s+{{ domain }}'
+        line: "  map                     {{ domain_folder }} {{ domain }}"
+
+    - name: Redémarrer LiteSpeed si des changements ont été effectués
+      ansible.builtin.service:
+        name: lsws
+        state: restarted
+

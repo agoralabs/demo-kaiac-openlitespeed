@@ -1,0 +1,88 @@
+{
+    "rules": [
+		{ 
+			"type" : "ingress",
+			"from_port" : "80",
+			"to_port" : "80",
+			"protocol" : "tcp",
+			"cidr_blocks" : "10.0.0.0/16"
+		},
+		{ 
+			"type" : "ingress",
+			"from_port" : "7080",
+			"to_port" : "7080",
+			"protocol" : "tcp",
+			"cidr_blocks" : "10.0.0.0/16"
+		},
+		{ 
+			"type" : "ingress",
+			"from_port" : "7080",
+			"to_port" : "7080",
+			"protocol" : "tcp",
+			"cidr_blocks" : "0.0.0.0/0"
+		},
+		{
+			"type" : "ingress",
+			"from_port" : "22",
+			"to_port" : "22",
+			"protocol" : "tcp",
+			"cidr_blocks" : "0.0.0.0/0"
+		},
+		{ 
+			"type" : "ingress",
+			"from_port" : "-1",
+			"to_port" : "-1",
+			"protocol" : "icmp",
+			"cidr_blocks" : "0.0.0.0/0"
+		},
+		{
+			"type" : "ingressv6",
+			"from_port" : "-1",
+			"to_port" : "-1",
+			"protocol" : "icmpv6",
+			"cidr_blocks" : "::/0"
+		},
+		{ 
+			"type" : "ingress",
+			"from_port" : "-1",
+			"to_port" : "-1",
+			"protocol" : "icmp",
+			"cidr_blocks" : "46.105.62.150/32"
+		},
+		{ 
+			"type" : "ingress",
+			"from_port" : "80",
+			"to_port" : "80",
+			"protocol" : "tcp",
+			"cidr_blocks" : "0.0.0.0/0"
+		},
+		{ 
+			"type" : "ingress",
+			"from_port" : "443",
+			"to_port" : "443",
+			"protocol" : "tcp",
+			"cidr_blocks" : "0.0.0.0/0"
+		},
+		{ 
+			"type" : "ingressv6",
+			"from_port" : "80",
+			"to_port" : "80",
+			"protocol" : "tcp",
+			"cidr_blocks" : "::/0"
+		},
+		{ 
+			"type" : "ingressv6",
+			"from_port" : "443",
+			"to_port" : "443",
+			"protocol" : "tcp",
+			"cidr_blocks" : "::/0"
+		},
+		{
+			"type" : "egress",
+			"from_port" : "0",
+			"to_port" : "0",
+			"protocol" : "-1",
+			"cidr_blocks" : "0.0.0.0/0"
+		}
+	]
+}

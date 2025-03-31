@@ -1,0 +1,197 @@
+---
+- name: Prepare servers
+  hosts: all
+  remote_user: ubuntu
+  become: true
+  vars:
+    const_running: running
+    const_awscli: aws-cli
+    ols_script_url: "https://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh"
+    ols_repo_script: "/tmp/enable_lst_debian_repo.sh"
+    mysql_variant: "mariadb"  # options: "mysql" or "mariadb"
+    aws_cli_url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+    aws_cli_zip: "/tmp/awscliv2.zip"
+    aws_cli_dir: "/tmp/aws"
+
+  tasks:
+    - name: Test sudo rights
+      command: whoami
+      register: result
+      become: true
+
+    - debug:
+        var: result.stdout
+
+    - name: "APT Update"
+      command: apt-get update -y
+      ignore_errors: yes
+
+    #Install ec2 instance connect
+    - name: Ansible apt install ec2 instance connect
+      apt:
+        name: ec2-instance-connect
+        state: present
+
+    # Install aws cli agent on Linux and Unix system
+    - name: "Install required packages (unzip, curl, ruby)"
+      command: apt-get install unzip curl ruby -y
+      ignore_errors: yes
+    # - name: Install required packages (unzip, curl)
+    #   package:
+    #     name:
+    #       - unzip
+    #       - curl
+    #     state: present
+
+    - name: Download AWS CLI v2
+      get_url:
+        url: "{{ aws_cli_url }}"
+        dest: "{{ aws_cli_zip }}"
+        mode: '0644'
+
+    - name: Unzip AWS CLI installer
+      unarchive:
+        src: "{{ aws_cli_zip }}"
+        dest: "/tmp"
+        remote_src: yes
+
+    - name: Run AWS CLI installer
+      command: "{{ aws_cli_dir }}/install --update"
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Ensure AWS CLI is installed
+      command: aws --version
+      register: aws_version
+      changed_when: false
+
+    - name: Show AWS CLI version
+      debug:
+        msg: "AWS CLI installed: {{ aws_version.stdout }}"
+
+    # Install aws CodeDeploy agent on Linux and Unix system
+    - name: "Check if CodeDeploy is already installed"
+      command: service codedeploy-agent status
+      ignore_errors: True
+      register: codedeploy_agent_status
+
+    - name: "Get CodeDeploy | s3"
+      get_url:
+        url: "https://aws-codedeploy-us-west-2.s3.us-west-2.amazonaws.com/latest/install"
+        dest: /tmp/codedeploy-install
+        mode: '0755'
+      when: const_running not in codedeploy_agent_status.stdout
+
+    # - name: "Codedeploy Install Binary | Permission Executable"
+    #   file:
+    #     state: file
+    #     path: /tmp/codedeploy-install
+    #     group: root
+    #     owner: root
+    #     mode: 0755
+    #   when: const_running not in codedeploy_agent_status.stdout
+
+    - name: "Codedeploy Install"
+      command: /tmp/codedeploy-install auto
+      when: const_running not in codedeploy_agent_status.stdout
+
+    - name: "APT Update"
+      command: apt-get update -y
+      ignore_errors: yes
+
+    # Install SSM
+    - name: "Install SSM"
+      shell: "{{ item }}"
+      ignore_errors: True
+      register: install_ssm_cmd
+      with_items:
+      - snap install amazon-ssm-agent --classic
+      - snap start amazon-ssm-agent
+
+    # Gather OS info
+    - name: Gather OS info
+      ansible.builtin.setup:
+        gather_subset:
+          - os_family
+          - distribution
+          - distribution_major_version
+          - distribution_release
+
+    # --- OpenLiteSpeed Installation ---
+    - name: Installer les dépendances nécessaires
+      apt:
+        name:
+          - curl
+          - gnupg
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Télécharger le script officiel pour activer le dépôt OpenLiteSpeed
+      get_url:
+        url: "{{ ols_script_url }}"
+        dest: "{{ ols_repo_script }}"
+        mode: "0755"
+
+    - name: Exécuter le script pour ajouter le dépôt et la clé GPG
+      command: "{{ ols_repo_script }}"
+
+    - name: Mettre à jour le cache APT
+      apt:
+        update_cache: yes
+
+    - name: Installer OpenLiteSpeed
+      apt:
+        name: openlitespeed
+        state: present
+
+    - name: S'assurer que OpenLiteSpeed est démarré et activé
+      systemd:
+        name: lsws
+        enabled: yes
+        state: started
+
+    - name: Afficher l'URL d'accès à l'interface d'admin
+      debug:
+        msg: "OpenLiteSpeed est installé. Accès admin : https://<IP>:7080"
+
+    # --- MySQL/MariaDB Installation ---
+    - name: Install MariaDB on Debian
+      apt:
+        name:
+          - mariadb-server
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+        - mysql_variant == "mariadb"
+
+    - name: Install MySQL on Debian
+      apt:
+        name:
+          - mysql-server
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+        - mysql_variant == "mysql"
+
+    - name: Install MariaDB on RHEL/CentOS
+      yum:
+        name: mariadb-server
+        state: present
+      when:
+        - ansible_os_family == "RedHat"
+        - mysql_variant == "mariadb"
+
+    - name: Install MySQL on RHEL/CentOS
+      yum:
+        name: mysql-server
+        state: present
+      when:
+        - ansible_os_family == "RedHat"
+        - mysql_variant == "mysql"
+
+    - name: Ensure MySQL/MariaDB is started and enabled
+      service:
+        name: "{{ 'mysql' if mysql_variant == 'mysql' else 'mariadb' }}"
+        state: started
+        enabled: true

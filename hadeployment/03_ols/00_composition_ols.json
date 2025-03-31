@@ -1,0 +1,16 @@
+{
+    "1": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/01_bkclustsg_lb.cfg",
+    "2": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/02_bkclustalb_clust.cfg",
+    "3": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/03_bkclusttg_80.cfg",
+    "4": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/04_bkclusttg_7080.cfg",
+    "5": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/05_bkclustlisten_ols.cfg",
+	"6": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/06_bkclustsg_ec2.cfg",
+	"7": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/07_bkec2profile.cfg",
+	"8": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/08_bkkeypair.cfg",
+	"9": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/09_bkclustasg_ols.cfg",
+    "10": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/10_bkclustasgattach_80.cfg",
+    "11": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/11_bkclustasgattach_7080.cfg",
+    "12": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/12_bkr53exposer_ols.cfg",
+    "13": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/13_bkr53exposer_site1.cfg",
+    "14": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/14_bkr53exposer_ols_ec2.cfg"
+}

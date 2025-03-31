@@ -1,0 +1,24 @@
+# vhost_template.conf.j2
+
+docRoot                   /var/www/{{ domain_folder }}/
+index  {
+  useServer               0
+  indexFiles              index.php
+}
+
+context / {
+  location                $VH_ROOT
+  allowBrowse             1
+  indexFiles              index.php
+
+  rewrite  {
+    enable                1
+    inherit               1
+    rewriteFile           /usr/local/lsws/{{ domain_folder }}/.htaccess
+  }
+}
+
+rewrite  {
+  enable                  1
+  autoLoadHtaccess        1
+}

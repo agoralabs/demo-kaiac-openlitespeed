@@ -1,0 +1,7 @@
+{
+    "1": "/vagrant/demo-kaiac-openlitespeed/hadeployment/01_db_ec2/01_bkclustsg_db.cfg",
+    "2": "/vagrant/demo-kaiac-openlitespeed/hadeployment/01_db_ec2/02_bkec2profile.cfg",
+    "3": "/vagrant/demo-kaiac-openlitespeed/hadeployment/01_db_ec2/03_bkkeypair.cfg",
+    "4": "/vagrant/demo-kaiac-openlitespeed/hadeployment/01_db_ec2/04_bkclustec2_db.cfg",
+    "5": "/vagrant/demo-kaiac-openlitespeed/hadeployment/01_db_ec2/05_bkr53exposer_db.cfg"
+}

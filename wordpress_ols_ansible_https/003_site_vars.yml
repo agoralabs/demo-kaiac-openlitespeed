@@ -1,0 +1,8 @@
+domain: site3.skyscaledev.com
+domain_folder: monsite3
+wp_db_name: monsite3_db
+wp_db_user: monsite3_user
+wp_db_password: motdepassefort
+mysql_db_host: "44.248.24.106"
+mysql_root_user: root
+mysql_root_password: "=Dorine11"
