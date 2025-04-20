@@ -1,0 +1,71 @@
+---
+- name: Installer CyberPanel sur Ubuntu EC2
+  hosts: all
+  become: true
+  vars:
+    cyberpanel_admin_password: "VotreMotDePasseAdmin123!"  # À changer !
+    cyberpanel_email: "secobo@yahoo.com"                  # À changer !
+
+  tasks:
+    # Mise à jour des paquets et installation des dépendances
+    - name: Mettre à jour les paquets
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Installer les dépendances
+      apt:
+        name:
+          - curl
+          - wget
+          - sudo
+          - gnupg2
+          - software-properties-common
+        state: present
+
+    # Téléchargement et installation de CyberPanel
+    - name: Installer CyberPanel
+      shell: |
+        sh <(curl https://cyberpanel.net/install.sh || wget -O - https://cyberpanel.net/install.sh) \
+          --mirror default \
+          -p "{{ cyberpanel_admin_password }}" \
+          -e "{{ cyberpanel_email }}"
+      args:
+        executable: /bin/bash
+      register: cyberpanel_install
+      ignore_errors: yes  # CyberPanel renvoie parfois des faux positifs
+
+    # Vérification de l'installation
+    - name: Vérifier que CyberPanel est installé
+      stat:
+        path: /usr/local/CyberCP
+      register: cyberpanel_dir
+
+    - name: Redémarrer LiteSpeed si nécessaire
+      service:
+        name: lsws
+        state: restarted
+      when: cyberpanel_dir.stat.exists
+
+    # Configuration de base (optionnel)
+    - name: Activer le pare-feu (UFW)
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - 22    # SSH
+        - 80    # HTTP
+        - 443   # HTTPS
+        - 8090  # Port admin CyberPanel
+
+    - name: Démarrer les services CyberPanel
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - lscpd       # Service principal CyberPanel
+        - lsws        # OpenLiteSpeed
+        - postfix     # Email (optionnel)
+        - dovecot     # Email (optionnel)

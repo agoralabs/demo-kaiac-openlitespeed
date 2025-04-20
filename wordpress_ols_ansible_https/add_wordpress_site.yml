@@ -57,17 +57,6 @@
         group: www-data
         mode: '0644'
 
-    # - name: Créer le fichier /root/.my.cnf avec les identifiants MySQL root
-    #   copy:
-    #     dest: /root/.my.cnf
-    #     content: |
-    #       [client]
-    #       user={{ lookup('env', 'MYSQL_ROOT_USER') }}
-    #       password={{ lookup('env', 'MYSQL_ROOT_PASSWORD') }}
-    #     owner: root
-    #     group: root
-    #     mode: '0600'
-
     - name: Créer la base de données MySQL
       mysql_db:
         name: "{{ wp_db_name }}"

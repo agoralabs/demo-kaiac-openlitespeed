@@ -1,0 +1,35 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+	  {
+		"Effect": "Allow",
+		"Action": [
+		  "sqs:ReceiveMessage",
+		  "sqs:DeleteMessage",
+		  "sqs:GetQueueAttributes"
+		],
+		"Resource": "arn:aws:sqs:us-west-2:041292242005:wordpress-site-creation-queue.fifo"
+	  },
+	  {
+		"Effect": "Allow",
+		"Action": [
+		  "route53:ChangeResourceRecordSets",
+		  "route53:ListHostedZonesByName"
+		],
+		"Resource": "*"
+	  },
+	  {
+		"Effect": "Allow",
+		"Action": [
+			"ec2:DescribeInstances",
+			"ssm:SendCommand"
+		],
+		"Resource": "*"
+	},
+	{
+		"Effect": "Allow",
+		"Action": "ssm:GetCommandInvocation",
+		"Resource": "arn:aws:ssm:*:*:document/AWS-RunShellScript"
+	}
+	]
+}

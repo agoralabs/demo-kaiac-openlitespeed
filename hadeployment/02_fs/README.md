@@ -38,9 +38,11 @@ drwxrwxrwx 2 root root 6144 Mar 31 11:27 www
 
 # Durées
 
+```
 End of the Composition demolition.
 
 3) MODULE bkshellremote DESTROY DURATION : 1m:6s
 2) MODULE awsefsvolume DESTROY DURATION : 1m:39s
 1) MODULE bkclustsg DESTROY DURATION : 1m:6s
 TOTAL DEMOLITION DURATION : 4m:3s
+```

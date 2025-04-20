@@ -1,0 +1,15 @@
+{
+    "NEXT_PUBLIC_API_URL": "https://kapress.skyscaledev.com",
+	"OLS_HOST": "ols.skyscaledev.com", 
+	"AWS_REGION_APP": "us-west-2",
+	"EC2_TAG_NAME": "Name",
+	"EC2_TAG_VALUE": "cbp-demo-staging-1",
+	"ALB_TAG_NAME": "Name",
+	"ALB_TAG_VALUE": "ols-alb-prod-lb",
+	"SCRIPT_COMMAND": "/home/ubuntu/deploy_wordpress.sh",
+	"DELETE_SCRIPT_COMMAND": "/home/ubuntu/delete_wordpress.sh",
+	"MYSQL_DB_HOST": "dbols.skyscaledev.com",
+	"MYSQL_ROOT_USER": "root",
+	"MYSQL_ROOT_PASSWORD": "=Dorine11",
+	"DEBUG": "true"
+}

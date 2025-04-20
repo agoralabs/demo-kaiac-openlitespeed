@@ -1,0 +1,6 @@
+{
+    "NEXT_PUBLIC_API_URL": "https://kapress.skyscaledev.com",
+	"MAILCOW_HOST": "mail.skyscaledev.com", 
+	"MAILCOW_API_KEY": "C28D4F-2ABA7C-D8581D-EDCC97-11692B",
+	"AWS_REGION_APP": "us-west-2"
+}

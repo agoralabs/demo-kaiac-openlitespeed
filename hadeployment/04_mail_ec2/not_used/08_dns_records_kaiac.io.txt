@@ -1,0 +1,8 @@
+$ORIGIN kaiac.io.
+@	IN	MX	mail.skyscaledev.com
+autodiscover	IN	CNAME	mail.skyscaledev.com
+_autodiscover._tcp	IN	SRV	mail.skyscaledev.com 443
+autoconfig	IN	CNAME	mail.skyscaledev.com
+;@	IN	TXT	**TODO**
+;_dmarc	IN	TXT	**TODO**
+dkim._domainkey	IN	TXT	v=DKIM1;k=rsa;t=s;s=email;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqirNkcSlMsOTGSVwBGP/hM5fceYTN0rnRhkyeFto3c2JUv0ZKTqH4pEiaz+/Q+xzv8dAFP9kHCVGNsPZpnCwRv6zqZBNgzp85zTeYm1fwqmWFzYQ70mbpj9hMF29Qu5WHbIOJsm6pTtSR2xvpy53qvlv4E/yE6Oos/2AuSI06deQRJHl1Mlj3WBx0qkLS7MUsisvdxKuGmfq96ORS6ymtqRTvZ/hyQR3GG+RZe586u80cNndDKxKHGhDGipSApVtnoDSlsXe+WO+y3rTJ7JVLWDhO2QKyhbNsWnQBBLQz+xEZ0VXN69kBhPMV9iMrRqcLT/2N9fllZS2PFIrfrxVfQIDAQAB

@@ -12,5 +12,8 @@
     "11": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/11_bkclustasgattach_7080.cfg",
     "12": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/12_bkr53exposer_ols.cfg",
     "13": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/13_bkr53exposer_site1.cfg",
-    "14": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/14_bkr53exposer_ols_ec2.cfg"
+    "14": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/14_bkr53exposer_ols_ec2.cfg",
+    "15": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/15_bksqsfifo_create_wordpress.cfg",
+    "16": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/16_bklambdafunction_wordpress.cfg",
+    "17": "/vagrant/demo-kaiac-openlitespeed/hadeployment/03_ols/17_bklambdasqstrigger_wordpress.cfg"
 }
