@@ -87,3 +87,35 @@ End of the Composition demolition.
 1) MODULE bkclustsg DESTROY DURATION : 1m:20s
 TOTAL DEMOLITION DURATION : 21m:47s
 ```
+
+
+# Téléchargement des scripts sh
+
+curl -o delete_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/wordpress_ols_ansible_https/delete_wordpress.sh
+
+
+curl -o deploy_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/wordpress_ols_ansible_https/deploy_wordpress.sh
+
+# Test la fonction Lambda
+
+{
+  "Records": [
+    {
+      "messageId": "19dd0b57-b21e-4ac1-bd88-01bbb068cb78",
+      "receiptHandle": "MessageReceiptHandle",
+      "body": "{\"command\":\"CREATE_WP\",\"domain\":\"site1.kaiac.io\",\"domain_folder\":\"site1_kaiac_io\",\"wp_db_name\":\"site1_kaiac_io_db\",\"wp_db_user\":\"wp_user\",\"wp_db_password\":\"=Dorine11\",\"php_version\":\"lsphp81\",\"wp_version\":\"6.5.2\"}",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1523232000000",
+        "SenderId": "123456789012",
+        "ApproximateFirstReceiveTimestamp": "1523232000001"
+        },
+      "messageAttributes": {},
+      "md5OfBody": "{{{md5_of_body}}}",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-west-2:041292242005:wordpress-site-queue.fifo",
+      "awsRegion": "us-west-2"
+
+    }
+  ]
+}

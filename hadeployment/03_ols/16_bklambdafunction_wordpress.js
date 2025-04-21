@@ -1,197 +1,238 @@
 const AWS = require('aws-sdk');
-const { Route53, ELBv2, EC2, SQS, SSM } = AWS;
 
-const route53 = new Route53();
-const elbv2 = new ELBv2();
-const ec2 = new EC2();
-const sqs = new SQS();
-const ssm = new SSM();
+// Configuration robuste du SDK AWS
+AWS.config.update({
+  region: process.env.AWS_REGION_APP || 'us-west-2',
+  maxRetries: 3,
+  retryDelayOptions: { base: 300 },
+  httpOptions: {
+    connectTimeout: 5000,
+    timeout: 10000
+  }
+});
 
-// Fonction pour trouver la zone hébergée
-async function getHostedZoneId(domain) {
-    const hostedZones = await route53.listHostedZonesByName({
-        DNSName: domain
-    }).promise();
-    
-    if (!hostedZones.HostedZones || hostedZones.HostedZones.length === 0) {
-        throw new Error(`Aucune zone hébergée trouvée pour le domaine : ${domain}`);
-    }
-    
-    const zone = hostedZones.HostedZones[0];
-    return zone.Id.split('/').pop();
-}
+// Clients AWS avec configuration explicite
+const clients = {
+  route53: new AWS.Route53(),
+  elbv2: new AWS.ELBv2(),
+  ec2: new AWS.EC2(),
+  sqs: new AWS.SQS(),
+  ssm: new AWS.SSM()
+};
 
-// Fonction pour trouver l'ALB par tag
+// Fonction améliorée pour trouver un ALB par tag
 async function findAlbByTag(tagName, tagValue) {
-    const albs = await elbv2.describeLoadBalancers().promise();
+  try {
+    console.log(`Recherche ALB avec tag ${tagName}=${tagValue}`);
     
-    for (const alb of albs.LoadBalancers) {
-        const tags = await elbv2.describeTags({
-            ResourceArns: [alb.LoadBalancerArn]
-        }).promise();
-        
-        const foundTag = tags.TagDescriptions[0].Tags.find(
-            t => t.Key === tagName && t.Value === tagValue
-        );
-        
-        if (foundTag) return alb;
+    const { LoadBalancers } = await clients.elbv2.describeLoadBalancers().promise();
+    if (!LoadBalancers || LoadBalancers.length === 0) {
+      throw new Error('Aucun ALB trouvé dans la région');
     }
-    
-    throw new Error(`ALB avec tag ${tagName}=${tagValue} non trouvé`);
-}
 
-// Fonction pour créer le site WordPress
-async function createWordPress(instanceId, message) {
-    const {
-        domain,
-        domain_folder,
-        wp_db_name,
-        wp_db_user,
-        wp_db_password,
-        php_version = 'lsphp81',
-        wp_version = 'latest'
-    } = message;
-
-    const command = [
-        process.env.SCRIPT_COMMAND || '/home/ubuntu/deploy_wordpress.sh',
-        `"${domain}"`,
-        `"${domain_folder}"`,
-        `"${wp_db_name}"`,
-        `"${wp_db_user}"`,
-        `"${wp_db_password}"`,
-        `"${process.env.MYSQL_DB_HOST}"`,
-        `"${process.env.MYSQL_ROOT_USER}"`,
-        `"${process.env.MYSQL_ROOT_PASSWORD}"`,
-        `"${php_version}"`,
-        `"${wp_version}"`
-    ].join(' ');
-
-    await ssm.sendCommand({
-        InstanceIds: [instanceId],
-        DocumentName: 'AWS-RunShellScript',
-        Parameters: { commands: [command] },
-        TimeoutSeconds: 300
-    }).promise();
-
-    // Configurer le DNS
-    const alb = await findAlbByTag(process.env.ALB_TAG_NAME || 'Name', process.env.ALB_TAG_VALUE);
-    const hostedZoneId = await getHostedZoneId(domain);
-    
-    await route53.changeResourceRecordSets({
-        HostedZoneId: hostedZoneId,
-        ChangeBatch: {
-            Changes: [{
-                Action: 'UPSERT',
-                ResourceRecordSet: {
-                    Name: domain,
-                    Type: 'A',
-                    AliasTarget: {
-                        HostedZoneId: 'Z35SXDOTRQ7X7K', // Zone ALB standard
-                        DNSName: alb.DNSName,
-                        EvaluateTargetHealth: false
-                    }
-                }
-            }]
+    for (const alb of LoadBalancers) {
+      try {
+        if (!alb.LoadBalancerArn?.startsWith('arn:aws:elasticloadbalancing')) {
+          continue;
         }
-    }).promise();
+
+        const { TagDescriptions } = await clients.elbv2.describeTags({
+          ResourceArns: [alb.LoadBalancerArn]
+        }).promise();
+
+        const hasMatchingTag = TagDescriptions[0].Tags.some(
+          tag => tag.Key === tagName && tag.Value === tagValue
+        );
+
+        if (hasMatchingTag) {
+          console.log('ALB trouvé:', {
+            dnsName: alb.DNSName,
+            hostedZoneId: alb.CanonicalHostedZoneId,
+            arn: alb.LoadBalancerArn
+          });
+          return alb;
+        }
+      } catch (error) {
+        console.error(`Erreur sur l'ALB ${alb.LoadBalancerArn}`, error.message);
+      }
+    }
+
+    throw new Error(`ALB avec tag ${tagName}=${tagValue} non trouvé`);
+  } catch (error) {
+    console.error('Erreur dans findAlbByTag:', error);
+    throw error;
+  }
 }
 
-// Fonction pour supprimer le site WordPress
-async function deleteWordPress(instanceId, message) {
-    const { domain, domain_folder, wp_db_name } = message;
-
-    // 1. Exécuter le script de suppression
-    const deleteCommand = [
-        process.env.DELETE_SCRIPT_COMMAND || '/home/ubuntu/delete_wordpress.sh',
-        `"${domain}"`,
-        `"${domain_folder}"`,
-        `"${wp_db_name}"`,
-        `"${process.env.MYSQL_ROOT_USER}"`,
-        `"${process.env.MYSQL_ROOT_PASSWORD}"`
-    ].join(' ');
-
-    await ssm.sendCommand({
-        InstanceIds: [instanceId],
-        DocumentName: 'AWS-RunShellScript',
-        Parameters: { commands: [deleteCommand] },
-        TimeoutSeconds: 300
+// Fonction pour gérer les enregistrements DNS
+async function manageDNSRecord(action, record, domain, alb) {
+  try {
+    const hostedZones = await clients.route53.listHostedZonesByName({
+      DNSName: domain
     }).promise();
 
-    // 2. Supprimer l'enregistrement DNS
-    try {
-        const hostedZoneId = await getHostedZoneId(domain);
-        await route53.changeResourceRecordSets({
-            HostedZoneId: hostedZoneId,
-            ChangeBatch: {
-                Changes: [{
-                    Action: 'DELETE',
-                    ResourceRecordSet: {
-                        Name: domain,
-                        Type: 'A',
-                        AliasTarget: {
-                            HostedZoneId: 'Z35SXDOTRQ7X7K',
-                            DNSName: (await findAlbByTag(process.env.ALB_TAG_NAME || 'Name', process.env.ALB_TAG_VALUE)).DNSName,
-                            EvaluateTargetHealth: false
-                        }
-                    }
-                }]
-            }
-        }).promise();
-    } catch (error) {
-        console.error("Erreur lors de la suppression DNS:", error);
+    if (!hostedZones.HostedZones.length) {
+      throw new Error(`Aucune zone hébergée pour ${domain}`);
     }
+
+    const hostedZoneId = hostedZones.HostedZones[0].Id.replace('/hostedzone/', '');
+    
+    const params = {
+      HostedZoneId: hostedZoneId,
+      ChangeBatch: {
+        Changes: [{
+          Action: action,
+          ResourceRecordSet: {
+            Name: record,
+            Type: 'A',
+            AliasTarget: {
+              HostedZoneId: alb.CanonicalHostedZoneId,
+              DNSName: alb.DNSName,
+              EvaluateTargetHealth: false
+            }
+          }
+        }]
+      }
+    };
+
+    console.log(`Envoi de la requête ${action} DNS pour ${domain}`);
+    return await clients.route53.changeResourceRecordSets(params).promise();
+  } catch (error) {
+    console.error(`Erreur lors de l'opération DNS ${action}`, error);
+    throw error;
+  }
+}
+
+// Fonction principale pour créer un site WordPress
+async function createWordPress(instanceId, message) {
+  const command = [
+    process.env.SCRIPT_COMMAND || '/home/ubuntu/deploy_wordpress.sh',
+    `"${message.record}.${message.domain}"`,
+    `"${message.domain_folder}"`,
+    `"${message.wp_db_name}"`,
+    `"${message.wp_db_user}"`,
+    `"${message.wp_db_password}"`,
+    `"${process.env.MYSQL_DB_HOST || 'localhost'}"`,
+    `"${process.env.MYSQL_ROOT_USER || 'root'}"`,
+    `"${process.env.MYSQL_ROOT_PASSWORD}"`,
+    `"${message.php_version || 'lsphp81'}"`,
+    `"${message.wp_version || 'latest'}"`
+  ].join(' ');
+
+  console.log('Exécution de la commande SSM:', command);
+  
+  await clients.ssm.sendCommand({
+    InstanceIds: [instanceId],
+    DocumentName: 'AWS-RunShellScript',
+    Parameters: { commands: [command] },
+    TimeoutSeconds: 300
+  }).promise();
+
+  const alb = await findAlbByTag(
+    process.env.ALB_TAG_NAME || 'Name',
+    process.env.ALB_TAG_VALUE
+  );
+  
+  return await manageDNSRecord('UPSERT', message.record, message.domain, alb);
+}
+
+// Fonction pour supprimer un site WordPress
+async function deleteWordPress(instanceId, message) {
+  const command = [
+    process.env.DELETE_SCRIPT_COMMAND || '/home/ubuntu/delete_wordpress.sh',
+    `"${message.record}.${message.domain}"`,
+    `"${message.domain_folder}"`,
+    `"${message.wp_db_name}"`,
+    `"${process.env.MYSQL_ROOT_USER || 'root'}"`,
+    `"${process.env.MYSQL_ROOT_PASSWORD}"`
+  ].join(' ');
+
+  console.log('Exécution de la commande de suppression:', command);
+  
+  await clients.ssm.sendCommand({
+    InstanceIds: [instanceId],
+    DocumentName: 'AWS-RunShellScript',
+    Parameters: { commands: [command] },
+    TimeoutSeconds: 300
+  }).promise();
+
+  try {
+    const alb = await findAlbByTag(
+      process.env.ALB_TAG_NAME || 'Name',
+      process.env.ALB_TAG_VALUE
+    );
+    await manageDNSRecord('DELETE', message.record, message.domain, alb);
+  } catch (error) {
+    console.error('Erreur lors de la suppression DNS (peut être normale si le record n\'existait pas):', error.message);
+  }
 }
 
 exports.handler = async (event) => {
-    try {
-        // Configuration
-        const {
-            EC2_TAG_NAME = 'Name',
-            EC2_TAG_VALUE
-        } = process.env;
+  console.log('Événement reçu:', JSON.stringify(event, null, 2));
 
-        for (const record of event.Records) {
-            const message = JSON.parse(record.body);
-            const { command } = message;
+  try {
+    // Validation de base
+    if (!event.Records || !Array.isArray(event.Records)) {
+      throw new Error('Format d\'événement invalide');
+    }
 
-            if (!['CREATE_WP', 'DELETE_WP'].includes(command)) {
-                throw new Error(`Commande invalide: ${command}`);
-            }
+    for (const record of event.Records) {
+      try {
+        const message = JSON.parse(record.body);
+        console.log('Traitement du message:', message);
 
-            // Trouver l'instance EC2
-            const ec2Data = await ec2.describeInstances({
-                Filters: [{ Name: `tag:${EC2_TAG_NAME}`, Values: [EC2_TAG_VALUE] }]
-            }).promise();
-            
-            const instanceId = ec2Data.Reservations?.[0]?.Instances?.[0]?.InstanceId;
-            if (!instanceId) throw new Error('Instance EC2 non trouvée');
-
-            // Exécuter la commande appropriée
-            if (command === 'CREATE_WP') {
-                await createWordPress(instanceId, message);
-                console.log(`Site WordPress créé pour ${message.domain}`);
-            } else {
-                await deleteWordPress(instanceId, message);
-                console.log(`Site WordPress supprimé pour ${message.domain}`);
-            }
-
-            // Supprimer le message SQS
-            await sqs.deleteMessage({
-                QueueUrl: record.eventSourceARN,
-                ReceiptHandle: record.receiptHandle
-            }).promise();
+        if (!['CREATE_WP', 'DELETE_WP'].includes(message.command)) {
+          throw new Error(`Commande invalide: ${message.command}`);
         }
 
-        return { statusCode: 200, body: 'Opération réussie' };
-    } catch (error) {
-        console.error('Erreur:', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                message: 'Échec du traitement',
-                error: error.message,
-                stack: process.env.DEBUG ? error.stack : undefined
-            })
-        };
+        // Trouver l'instance EC2
+        const { Reservations } = await clients.ec2.describeInstances({
+          Filters: [{
+            Name: `tag:${process.env.EC2_TAG_NAME || 'Name'}`,
+            Values: [process.env.EC2_TAG_VALUE]
+          }]
+        }).promise();
+
+        const instanceId = Reservations?.[0]?.Instances?.[0]?.InstanceId;
+        if (!instanceId) throw new Error('Instance EC2 non trouvée');
+
+        // Exécuter la commande appropriée
+        if (message.command === 'CREATE_WP') {
+          await createWordPress(instanceId, message);
+          console.log(`Site WordPress créé pour ${message.record}.${message.domain}`);
+        } else {
+          await deleteWordPress(instanceId, message);
+          console.log(`Site WordPress supprimé pour ${message.record}.${message.domain}`);
+        }
+
+        // Supprimer le message SQS
+        await clients.sqs.deleteMessage({
+          QueueUrl: record.eventSourceARN,
+          ReceiptHandle: record.receiptHandle
+        }).promise();
+
+      } catch (recordError) {
+        console.error('Erreur de traitement du message:', {
+          message: record.body,
+          error: recordError
+        });
+      }
     }
+
+    return { statusCode: 200, body: 'Traitement terminé avec succès' };
+  } catch (error) {
+    console.error('Erreur globale:', {
+      error: error.message,
+      stack: error.stack,
+      event: event
+    });
+    
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: 'Erreur de traitement',
+        error: error.message
+      })
+    };
+  }
 };

@@ -3,7 +3,7 @@
 	"OLS_HOST": "ols.skyscaledev.com", 
 	"AWS_REGION_APP": "us-west-2",
 	"EC2_TAG_NAME": "Name",
-	"EC2_TAG_VALUE": "cbp-demo-staging-1",
+	"EC2_TAG_VALUE": "ols-web-prod-asg",
 	"ALB_TAG_NAME": "Name",
 	"ALB_TAG_VALUE": "ols-alb-prod-lb",
 	"SCRIPT_COMMAND": "/home/ubuntu/deploy_wordpress.sh",

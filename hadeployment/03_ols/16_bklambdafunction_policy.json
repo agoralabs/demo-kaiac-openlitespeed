@@ -8,13 +8,16 @@
 		  "sqs:DeleteMessage",
 		  "sqs:GetQueueAttributes"
 		],
-		"Resource": "arn:aws:sqs:us-west-2:041292242005:wordpress-site-creation-queue.fifo"
+		"Resource": "arn:aws:sqs:us-west-2:041292242005:wordpress-site-queue.fifo"
 	  },
 	  {
 		"Effect": "Allow",
 		"Action": [
 		  "route53:ChangeResourceRecordSets",
-		  "route53:ListHostedZonesByName"
+		  "route53:ListHostedZonesByName",
+		  "route53:ListHostedZones",
+		  "elasticloadbalancing:DescribeLoadBalancers",
+		  "elasticloadbalancing:DescribeTags"
 		],
 		"Resource": "*"
 	  },

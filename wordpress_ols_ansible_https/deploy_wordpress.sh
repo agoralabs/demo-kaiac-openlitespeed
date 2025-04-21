@@ -126,7 +126,7 @@ require_once ABSPATH . 'wp-settings.php';
 EOL
 
 sudo chown www-data:www-data "${WEB_ROOT}/wp-config.php"
-sudo chmod 640 "${WEB_ROOT}/wp-config.php"
+sudo chmod 644 "${WEB_ROOT}/wp-config.php"
 
 # Configurer la base de données
 echo "Configuration de la base de données MySQL..."

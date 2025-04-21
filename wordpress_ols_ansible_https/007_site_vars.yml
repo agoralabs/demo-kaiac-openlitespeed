@@ -3,6 +3,6 @@ domain_folder: monsite7
 wp_db_name: monsite7_db
 wp_db_user: monsite7_user
 wp_db_password: motdepassefort
-mysql_db_host: "35.91.34.190"
+mysql_db_host: "dbols.skyscaledev.com"
 mysql_root_user: root
 mysql_root_password: "=Dorine11"
