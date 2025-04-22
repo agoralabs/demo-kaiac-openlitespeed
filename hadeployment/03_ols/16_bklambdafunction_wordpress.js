@@ -172,6 +172,7 @@ exports.handler = async (event) => {
 
   try {
     // Validation de base
+    console.log(`Validation de base`);
     if (!event.Records || !Array.isArray(event.Records)) {
       throw new Error('Format d\'événement invalide');
     }
@@ -184,7 +185,7 @@ exports.handler = async (event) => {
         if (!['CREATE_WP', 'DELETE_WP'].includes(message.command)) {
           throw new Error(`Commande invalide: ${message.command}`);
         }
-
+        console.log(`Trouver l'instance EC2`);
         // Trouver l'instance EC2
         const { Reservations } = await clients.ec2.describeInstances({
           Filters: [{
@@ -196,20 +197,29 @@ exports.handler = async (event) => {
         const instanceId = Reservations?.[0]?.Instances?.[0]?.InstanceId;
         if (!instanceId) throw new Error('Instance EC2 non trouvée');
 
+        console.log(`Instance EC2 non trouvée ${instanceId}`);
+
+        console.log(`Exécuter la commande appropriée ${message.command}`);
         // Exécuter la commande appropriée
         if (message.command === 'CREATE_WP') {
           await createWordPress(instanceId, message);
           console.log(`Site WordPress créé pour ${message.record}.${message.domain}`);
+          
         } else {
           await deleteWordPress(instanceId, message);
           console.log(`Site WordPress supprimé pour ${message.record}.${message.domain}`);
         }
 
+        console.log(`Commande appropriée ${message.command} exécutée`);
+
+        console.log(`Supprimer le message SQS ${record.eventSourceARN}`);
         // Supprimer le message SQS
         await clients.sqs.deleteMessage({
           QueueUrl: record.eventSourceARN,
           ReceiptHandle: record.receiptHandle
         }).promise();
+
+        console.log(`Message supprimé de la queue SQS ${record.eventSourceARN}`);
 
       } catch (recordError) {
         console.error('Erreur de traitement du message:', {

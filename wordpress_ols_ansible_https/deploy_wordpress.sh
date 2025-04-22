@@ -174,7 +174,7 @@ context / {
   rewrite  {
     enable                1
     inherit               1
-    rewriteFile           /usr/local/lsws/${DOMAIN_FOLDER}/.htaccess
+    rewriteFile           /var/www/${DOMAIN_FOLDER}/.htaccess
   }
 }
 
