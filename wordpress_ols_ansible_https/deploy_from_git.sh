@@ -14,11 +14,6 @@
 # GIT_TOKEN=$5
 
 # Récupération des arguments
-LOCAL_FOLDER="/tmp/clone-wp"
-GIT_REPO_URL="https://github.com/agoralabs/demo-kaiac-wordpress.git"
-GIT_BRANCH="main"
-GIT_USERNAME="jekobokidou"
-GIT_TOKEN="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"
 
 # Construction de l'URL avec les credentials
 CLEAN_URL=${GIT_REPO_URL#https://}
