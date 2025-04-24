@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 10 ]; then
-    echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>"
+if [ "$#" -ne 15 ]; then
+    echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
     exit 1
@@ -19,14 +19,18 @@ MYSQL_ROOT_USER="$7" # provient des variables d'environnement
 MYSQL_ROOT_PASSWORD="$8" # provient des variables d'environnement
 PHP_VERSION="$9" # provient du message SQS
 WP_VERSION="${10}" # provient du message SQS
+INSTALLATION_METHOD="${11}" # provient du message SQS
+GIT_REPO_URL="${12}" # provient du message SQS
+GIT_BRANCH="${13}" # provient du message SQS
+GIT_USERNAME="${14}" # provient du message SQS
+GIT_TOKEN="${15}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
 WEB_ROOT="/var/www/${DOMAIN_FOLDER}"
 VHOST_CONF="/usr/local/lsws/conf/vhosts/${DOMAIN_FOLDER}/vhconf.conf"
 HTTPD_CONF="/usr/local/lsws/conf/httpd_config.conf"
-WP_DOWNLOAD_URL="https://wordpress.org/wordpress-${WP_VERSION}.tar.gz"
-[ "$WP_VERSION" = "latest" ] && WP_DOWNLOAD_URL="https://wordpress.org/latest.tar.gz"
+
 
 # Fonction pour générer des clés aléatoires sécurisées
 generate_wordpress_key() {
@@ -74,17 +78,104 @@ sudo mkdir -p "${WEB_ROOT}"
 sudo chown nobody:nogroup "${WEB_ROOT}"
 sudo chmod 755 "${WEB_ROOT}"
 
-# Télécharger et extraire WordPress
-echo "Téléchargement de WordPress ${WP_VERSION}..."
-if ! wget -q -O /tmp/wordpress.tar.gz "${WP_DOWNLOAD_URL}"; then
-    echo "Erreur: Impossible de télécharger WordPress version ${WP_VERSION}"
-    echo "Veuillez vérifier que la version existe sur https://wordpress.org/download/releases/"
-    exit 1
-fi
+# Fonction pour installer WordPress standard
+install_wordpress_standard() {
+    local folder=$1
+    local version=$2
+    
+    echo "Téléchargement de WordPress version ${version}..."
+    WP_DOWNLOAD_URL="https://wordpress.org/wordpress-${version}.tar.gz"
+    [ "$version" = "latest" ] && WP_DOWNLOAD_URL="https://wordpress.org/latest.tar.gz"
 
-echo "Extraction de WordPress..."
-sudo tar -xzf /tmp/wordpress.tar.gz --strip-components=1 -C "${WEB_ROOT}"
-rm -f /tmp/wordpress.tar.gz
+
+    # Création d'un dossier temporaire
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR" || exit 1
+
+    # Téléchargement et extraction
+    wget -q "$WP_DOWNLOAD_URL" -O wordpress.tar.gz
+    if [ $? -ne 0 ]; then
+        echo "Échec du téléchargement de WordPress"
+        exit 1
+    fi
+
+    tar -xzf wordpress.tar.gz
+    rm wordpress.tar.gz
+
+    # Déplacement vers le dossier cible
+    if [ -d "$folder" ]; then
+        # Suppression du contenu existant
+        rm -rf "${folder:?}/"*
+    else
+        mkdir -p "$folder"
+    fi
+
+    mv wordpress/* "$folder"
+    rm -r wordpress
+
+    echo "WordPress ${version} installé avec succès dans ${folder}"
+}
+
+# Fonction pour installer via Git
+install_wordpress_git() {
+    local folder=$1
+    local repo_url=$2
+    local branch=$3
+    local username=$4
+    local token=$5
+
+    # Construction de l'URL avec les credentials
+    CLEAN_URL=${repo_url#https://}
+    AUTH_URL="https://${username}:${token}@${CLEAN_URL}"
+
+    # Fonction pour vérifier si un dossier est un dépôt Git
+    is_git_repo() {
+        [ -d "$1/.git" ]
+    }
+
+    # Vérification si le dossier local existe
+    if [ -d "$folder" ]; then
+        if is_git_repo "$folder"; then
+            echo "Dépôt Git existant détecté. Mise à jour..."
+            cd "$folder" || exit 1
+            
+            # Réinitialisation des changements locaux éventuels
+            git reset --hard
+            
+            # Vérification de la branche
+            CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+            if [ "$CURRENT_BRANCH" != "$branch" ]; then
+                git checkout "$branch" || git checkout -b "$branch" --track "origin/$branch"
+            fi
+            
+            # Pull des derniers changements
+            git pull "$AUTH_URL" "$branch"
+        else
+            echo "Le dossier existe mais n'est pas un dépôt Git."
+            echo "Suppression du contenu existant et nouveau clonage..."
+            rm -rf "${folder:?}/"*
+            git clone -b "$branch" "$AUTH_URL" "$folder"
+        fi
+    else
+        echo "Clonage du dépôt dans un nouveau dossier..."
+        git clone -b "$branch" "$AUTH_URL" "$folder"
+    fi
+}
+
+# Installation selon la méthode choisie
+case "$INSTALLATION_METHOD" in
+    "standard")
+        install_wordpress_standard "$WEB_ROOT" "$WP_VERSION"
+        ;;
+    "git")
+        install_wordpress_git "$WEB_ROOT" "$GIT_REPO_URL" "$GIT_BRANCH" "$GIT_USERNAME" "$GIT_TOKEN"
+        ;;
+    *)
+        echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
+        echo "Utilisez 'standard' ou 'git'"
+        exit 1
+        ;;
+esac
 
 # Générer les clés de sécurité
 echo "Génération des clés de sécurité..."
@@ -213,7 +304,7 @@ sudo systemctl restart lsws
 
 echo "=== Déploiement terminé avec succès ==="
 echo "URL: http://${DOMAIN}"
-echo "Version WordPress: ${WP_VERSION}"
+echo "Methode: ${INSTALLATION_METHOD}"
 echo "Répertoire WordPress: ${WEB_ROOT}"
 echo "Base de données: ${WP_DB_NAME}"
 echo "======================================"

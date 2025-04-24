@@ -116,8 +116,14 @@ async function createWordPress(instanceId, message) {
     `"${process.env.MYSQL_ROOT_USER || 'root'}"`,
     `"${process.env.MYSQL_ROOT_PASSWORD}"`,
     `"${message.php_version || 'lsphp81'}"`,
-    `"${message.wp_version || 'latest'}"`
+    `"${message.wp_version || 'latest'}"`,
+    `"${message.installation_method || 'standard'}"`,
+    `"${message.git_repo_url}"`,
+    `"${message.git_branch}"`,
+    `"${message.git_username}"`,
+    `"${message.git_token}"`
   ].join(' ');
+
 
   console.log('Exécution de la commande SSM:', command);
   
