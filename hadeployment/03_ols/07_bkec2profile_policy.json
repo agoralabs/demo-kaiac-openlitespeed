@@ -55,7 +55,8 @@
             "Effect": "Allow",
             "Action": [
                 "route53:ChangeResourceRecordSets",
-                "route53:ListHostedZonesByName"
+                "route53:ListHostedZonesByName",
+                "route53:ListResourceRecordSets"
             ],
             "Resource": "*"
         },

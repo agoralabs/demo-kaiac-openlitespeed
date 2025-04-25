@@ -41,7 +41,7 @@ delete_record() {
     # Récupérer l'enregistrement existant pour vérification
     EXISTING_RECORD=$(aws route53 list-resource-record-sets \
         --hosted-zone-id "$HOSTED_ZONE_ID" \
-        --query "ResourceRecordSets[?Name == '$RECORD_NAME.$TOP_DOMAIN.' && Type == 'CNAME']" \
+        --query "ResourceRecordSets[?Name == '$RECORD_NAME.$TOP_DOMAIN.']" \
         --output json)
 
     if [ "$EXISTING_RECORD" = "[]" ]; then
