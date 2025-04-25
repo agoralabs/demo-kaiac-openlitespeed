@@ -374,7 +374,7 @@ EOF
     # Nettoyer le fichier temporaire
     rm -f "$TMP_FILE"
 
-    echo "Enregistrement DNS $RECORD_NAME.$DOMAIN créé/modifié pour pointer vers $ALB_DNS_NAME"
+    echo "Enregistrement DNS $RECORD_NAME.$TOP_DOMAIN créé/modifié pour pointer vers $ALB_DNS_NAME"
 }
 
 

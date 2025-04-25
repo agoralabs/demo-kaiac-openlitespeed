@@ -119,3 +119,42 @@ curl -o deploy_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kai
     }
   ]
 }
+
+# Logs d'execution du script shell déclenché par Lambda
+
+=== Configuration du déploiement WordPress ===
+Domaine: site2.skyscaledev.com
+Dossier: /var/www/site2_skyscaledev_com
+Version WordPress: 6.5.2
+Base de données: site2_skyscaledev_com_db
+Utilisateur DB: site2_skyscaledev_com_db_usr
+Hôte MySQL: dbols.skyscaledev.com
+Version PHP: lsphp81
+============================================
+Installation des dépendances...
+Création du dossier du site...
+Le dossier existe mais n'est pas un dépôt Git.
+Suppression du contenu existant et nouveau clonage...
+Génération des clés de sécurité...
+Configuration de wp-config.php...
+Configuration de la base de données MySQL...
+Configuration d'OpenLiteSpeed...
+Configuration du virtual host...
+Ajout du virtualhost...
+Ajout de la règle map...
+Redémarrage du service OpenLiteSpeed...
+{
+    "ChangeInfo": {
+        "Id": "/change/C01837583LWI48037P9LR",
+        "Status": "PENDING",
+        "SubmittedAt": "2025-04-25T17:43:12.008000+00:00",
+        "Comment": "Création de l'enregistrement site2.skyscaledev.com"
+    }
+}
+Enregistrement DNS site2.site2.skyscaledev.com créé/modifié pour pointer vers ols-alb-prod-lb-182125202.us-west-2.elb.amazonaws.com
+=== Déploiement terminé avec succès ===
+URL: http://site2.skyscaledev.com
+Methode: git
+Répertoire WordPress: /var/www/site2_skyscaledev_com
+Base de données: site2_skyscaledev_com_db
+======================================

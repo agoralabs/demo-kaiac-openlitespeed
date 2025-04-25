@@ -13,116 +13,37 @@ AWS.config.update({
 
 // Clients AWS avec configuration explicite
 const clients = {
-  route53: new AWS.Route53(),
-  elbv2: new AWS.ELBv2(),
   ec2: new AWS.EC2(),
   sqs: new AWS.SQS(),
   ssm: new AWS.SSM()
 };
 
-// Fonction améliorée pour trouver un ALB par tag
-async function findAlbByTag(tagName, tagValue) {
-  try {
-    console.log(`Recherche ALB avec tag ${tagName}=${tagValue}`);
-    
-    const { LoadBalancers } = await clients.elbv2.describeLoadBalancers().promise();
-    if (!LoadBalancers || LoadBalancers.length === 0) {
-      throw new Error('Aucun ALB trouvé dans la région');
-    }
+// Fonction pour vérifier le statut de la commande SSM
+async function waitForCommandCompletion(instanceId, commandId) {
+  const maxAttempts = parseInt(process.env.SSM_MAX_ATTEMPTS || '60'); // 60 tentatives par défaut
+  const delay = parseInt(process.env.SSM_RETRY_DELAY_MS || '5000'); // 5 secondes par défaut
 
-    for (const alb of LoadBalancers) {
-      try {
-        if (!alb.LoadBalancerArn?.startsWith('arn:aws:elasticloadbalancing')) {
-          continue;
-        }
+  console.log(`Attente de la commande SSM (maxAttempts=${maxAttempts}, delay=${delay}ms)`);
 
-        const { TagDescriptions } = await clients.elbv2.describeTags({
-          ResourceArns: [alb.LoadBalancerArn]
-        }).promise();
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, delay));
 
-        const hasMatchingTag = TagDescriptions[0].Tags.some(
-          tag => tag.Key === tagName && tag.Value === tagValue
-        );
-
-        if (hasMatchingTag) {
-          console.log('ALB trouvé:', {
-            dnsName: alb.DNSName,
-            hostedZoneId: alb.CanonicalHostedZoneId,
-            arn: alb.LoadBalancerArn
-          });
-          return alb;
-        }
-      } catch (error) {
-        console.error(`Erreur sur l'ALB ${alb.LoadBalancerArn}`, error.message);
-      }
-    }
-
-    throw new Error(`ALB avec tag ${tagName}=${tagValue} non trouvé`);
-  } catch (error) {
-    console.error('Erreur dans findAlbByTag:', error);
-    throw error;
-  }
-}
-
-// Fonction pour gérer les enregistrements DNS
-async function manageDNSRecord(action, record, domain, alb) {
-  try {
-    const hostedZones = await clients.route53.listHostedZonesByName({
-      DNSName: domain
+    const result = await clients.ssm.getCommandInvocation({
+      CommandId: commandId,
+      InstanceId: instanceId
     }).promise();
 
-    if (!hostedZones.HostedZones.length) {
-      throw new Error(`Aucune zone hébergée pour ${domain}`);
+    console.log(`Statut de la commande ${commandId} (tentative ${attempt + 1}/${maxAttempts}): ${result.Status}`);
+
+    if (result.Status === 'Success') {
+      console.log(`Commande réussie. Sortie: ${result.StandardOutputContent}`);
+      return { output: result.StandardOutputContent, error: result.StandardErrorContent };
+    } else if (['Failed', 'Cancelled', 'TimedOut'].includes(result.Status)) {
+      throw new Error(`Échec de l'exécution de la commande: ${result.StandardErrorContent || result.Status}`);
     }
-
-    const hostedZoneId = hostedZones.HostedZones[0].Id.replace('/hostedzone/', '');
-    
-    // const params = {
-    //   HostedZoneId: hostedZoneId,
-    //   ChangeBatch: {
-    //     Changes: [{
-    //       Action: action,
-    //       ResourceRecordSet: {
-    //         Name: record,
-    //         Type: 'A',
-    //         AliasTarget: {
-    //           HostedZoneId: alb.CanonicalHostedZoneId,
-    //           DNSName: alb.DNSName,
-    //           EvaluateTargetHealth: false
-    //         }
-    //       }
-    //     }]
-    //   }
-    // };
-
-    const params = {
-      HostedZoneId: hostedZoneId,
-      ChangeBatch: {
-          Changes: [
-              {
-                  Action: action, // Crée ou met à jour l'enregistrement
-                  ResourceRecordSet: {
-                      Name: record,
-                      Type: 'CNAME',
-                      ResourceRecords: [
-                          {
-                            HostedZoneId: alb.CanonicalHostedZoneId,
-                            DNSName: alb.DNSName,
-                            EvaluateTargetHealth: false
-                          }
-                      ]
-                  }
-              }
-          ]
-      }
-  };
-
-    console.log(`Envoi de la requête ${action} DNS pour ${domain}`);
-    return await clients.route53.changeResourceRecordSets(params).promise();
-  } catch (error) {
-    console.error(`Erreur lors de l'opération DNS ${action}`, error);
-    throw error;
   }
+
+  throw new Error(`Délai d'attente dépassé (${maxAttempts * delay / 1000}s) pour la commande SSM`);
 }
 
 // Fonction principale pour créer un site WordPress
@@ -150,29 +71,22 @@ async function createWordPress(instanceId, message) {
     `"${process.env.ALB_TAG_VALUE}"`
   ].join(' ');
 
-
   console.log('Exécution de la commande SSM:', command);
   
-  await clients.ssm.sendCommand({
+  const { Command } = await clients.ssm.sendCommand({
     InstanceIds: [instanceId],
     DocumentName: 'AWS-RunShellScript',
     Parameters: { commands: [command] },
     TimeoutSeconds: 300
   }).promise();
 
-  // const alb = await findAlbByTag(
-  //   process.env.ALB_TAG_NAME || 'Name',
-  //   process.env.ALB_TAG_VALUE
-  // );
-  
-  //return await manageDNSRecord('UPSERT', message.record, message.domain, alb);
+  // Attendre la fin de l'exécution
+  await waitForCommandCompletion(instanceId, Command.CommandId);
 
-  // fin de la fonction retourner quelque chose
   return {
     statusCode: 200,
     body: JSON.stringify('WordPress site created successfully')
   };
-   
 }
 
 // Fonction pour supprimer un site WordPress
@@ -190,22 +104,15 @@ async function deleteWordPress(instanceId, message) {
 
   console.log('Exécution de la commande de suppression:', command);
   
-  await clients.ssm.sendCommand({
+  const { Command } = await clients.ssm.sendCommand({
     InstanceIds: [instanceId],
     DocumentName: 'AWS-RunShellScript',
     Parameters: { commands: [command] },
     TimeoutSeconds: 300
   }).promise();
 
-  // try {
-  //   const alb = await findAlbByTag(
-  //     process.env.ALB_TAG_NAME || 'Name',
-  //     process.env.ALB_TAG_VALUE
-  //   );
-  //   await manageDNSRecord('DELETE', message.record, message.domain, alb);
-  // } catch (error) {
-  //   console.error('Erreur lors de la suppression DNS (peut être normale si le record n\'existait pas):', error.message);
-  // }
+  // Attendre la fin de l'exécution
+  await waitForCommandCompletion(instanceId, Command.CommandId);
 }
 
 exports.handler = async (event) => {
@@ -238,14 +145,13 @@ exports.handler = async (event) => {
         const instanceId = Reservations?.[0]?.Instances?.[0]?.InstanceId;
         if (!instanceId) throw new Error('Instance EC2 non trouvée');
 
-        console.log(`Instance EC2 non trouvée ${instanceId}`);
+        console.log(`Instance EC2 trouvée: ${instanceId}`);
 
         console.log(`Exécuter la commande appropriée ${message.command}`);
         // Exécuter la commande appropriée
         if (message.command === 'CREATE_WP') {
           await createWordPress(instanceId, message);
           console.log(`Site WordPress créé pour ${message.record}.${message.domain}`);
-          
         } else {
           await deleteWordPress(instanceId, message);
           console.log(`Site WordPress supprimé pour ${message.record}.${message.domain}`);

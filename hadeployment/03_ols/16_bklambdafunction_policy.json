@@ -25,14 +25,10 @@
 		"Effect": "Allow",
 		"Action": [
 			"ec2:DescribeInstances",
-			"ssm:SendCommand"
+			"ssm:SendCommand",
+			"ssm:GetCommandInvocation"
 		],
 		"Resource": "*"
-	},
-	{
-		"Effect": "Allow",
-		"Action": "ssm:GetCommandInvocation",
-		"Resource": "arn:aws:ssm:*:*:document/AWS-RunShellScript"
 	}
 	]
 }

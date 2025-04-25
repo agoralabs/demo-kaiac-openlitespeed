@@ -11,5 +11,7 @@
 	"MYSQL_DB_HOST": "dbols.skyscaledev.com",
 	"MYSQL_ROOT_USER": "root",
 	"MYSQL_ROOT_PASSWORD": "=Dorine11",
-	"DEBUG": "true"
+	"DEBUG": "true",
+	"SSM_MAX_ATTEMPTS": "60",
+	"SSM_RETRY_DELAY_MS": "5000"
 }
