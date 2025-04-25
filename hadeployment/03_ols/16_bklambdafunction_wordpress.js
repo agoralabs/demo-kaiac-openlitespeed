@@ -77,23 +77,45 @@ async function manageDNSRecord(action, record, domain, alb) {
 
     const hostedZoneId = hostedZones.HostedZones[0].Id.replace('/hostedzone/', '');
     
+    // const params = {
+    //   HostedZoneId: hostedZoneId,
+    //   ChangeBatch: {
+    //     Changes: [{
+    //       Action: action,
+    //       ResourceRecordSet: {
+    //         Name: record,
+    //         Type: 'A',
+    //         AliasTarget: {
+    //           HostedZoneId: alb.CanonicalHostedZoneId,
+    //           DNSName: alb.DNSName,
+    //           EvaluateTargetHealth: false
+    //         }
+    //       }
+    //     }]
+    //   }
+    // };
+
     const params = {
       HostedZoneId: hostedZoneId,
       ChangeBatch: {
-        Changes: [{
-          Action: action,
-          ResourceRecordSet: {
-            Name: record,
-            Type: 'A',
-            AliasTarget: {
-              HostedZoneId: alb.CanonicalHostedZoneId,
-              DNSName: alb.DNSName,
-              EvaluateTargetHealth: false
-            }
-          }
-        }]
+          Changes: [
+              {
+                  Action: action, // Crée ou met à jour l'enregistrement
+                  ResourceRecordSet: {
+                      Name: record,
+                      Type: 'CNAME',
+                      ResourceRecords: [
+                          {
+                            HostedZoneId: alb.CanonicalHostedZoneId,
+                            DNSName: alb.DNSName,
+                            EvaluateTargetHealth: false
+                          }
+                      ]
+                  }
+              }
+          ]
       }
-    };
+  };
 
     console.log(`Envoi de la requête ${action} DNS pour ${domain}`);
     return await clients.route53.changeResourceRecordSets(params).promise();
@@ -121,7 +143,11 @@ async function createWordPress(instanceId, message) {
     `"${message.git_repo_url}"`,
     `"${message.git_branch}"`,
     `"${message.git_username}"`,
-    `"${message.git_token}"`
+    `"${message.git_token}"`,
+    `"${message.record}"`,
+    `"${message.domain}"`,
+    `"${process.env.ALB_TAG_NAME || 'Name'}"`,
+    `"${process.env.ALB_TAG_VALUE}"`
   ].join(' ');
 
 
@@ -134,12 +160,19 @@ async function createWordPress(instanceId, message) {
     TimeoutSeconds: 300
   }).promise();
 
-  const alb = await findAlbByTag(
-    process.env.ALB_TAG_NAME || 'Name',
-    process.env.ALB_TAG_VALUE
-  );
+  // const alb = await findAlbByTag(
+  //   process.env.ALB_TAG_NAME || 'Name',
+  //   process.env.ALB_TAG_VALUE
+  // );
   
-  return await manageDNSRecord('UPSERT', message.record, message.domain, alb);
+  //return await manageDNSRecord('UPSERT', message.record, message.domain, alb);
+
+  // fin de la fonction retourner quelque chose
+  return {
+    statusCode: 200,
+    body: JSON.stringify('WordPress site created successfully')
+  };
+   
 }
 
 // Fonction pour supprimer un site WordPress
@@ -150,7 +183,9 @@ async function deleteWordPress(instanceId, message) {
     `"${message.domain_folder}"`,
     `"${message.wp_db_name}"`,
     `"${process.env.MYSQL_ROOT_USER || 'root'}"`,
-    `"${process.env.MYSQL_ROOT_PASSWORD}"`
+    `"${process.env.MYSQL_ROOT_PASSWORD}"`,
+    `"${message.record}"`,
+    `"${message.domain}"`
   ].join(' ');
 
   console.log('Exécution de la commande de suppression:', command);
@@ -162,15 +197,15 @@ async function deleteWordPress(instanceId, message) {
     TimeoutSeconds: 300
   }).promise();
 
-  try {
-    const alb = await findAlbByTag(
-      process.env.ALB_TAG_NAME || 'Name',
-      process.env.ALB_TAG_VALUE
-    );
-    await manageDNSRecord('DELETE', message.record, message.domain, alb);
-  } catch (error) {
-    console.error('Erreur lors de la suppression DNS (peut être normale si le record n\'existait pas):', error.message);
-  }
+  // try {
+  //   const alb = await findAlbByTag(
+  //     process.env.ALB_TAG_NAME || 'Name',
+  //     process.env.ALB_TAG_VALUE
+  //   );
+  //   await manageDNSRecord('DELETE', message.record, message.domain, alb);
+  // } catch (error) {
+  //   console.error('Erreur lors de la suppression DNS (peut être normale si le record n\'existait pas):', error.message);
+  // }
 }
 
 exports.handler = async (event) => {

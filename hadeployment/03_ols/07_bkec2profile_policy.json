@@ -50,6 +50,26 @@
             "Effect": "Allow",
             "Action": "elasticfilesystem:*",
             "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "route53:ChangeResourceRecordSets",
+                "route53:ListHostedZonesByName"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "elasticloadbalancing:DescribeLoadBalancers",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "tag:GetResources"
+            ],
+            "Resource": "*"
         }
     ]
 }
