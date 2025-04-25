@@ -41,11 +41,11 @@ delete_record() {
     # Récupérer l'enregistrement existant pour vérification
     EXISTING_RECORD=$(aws route53 list-resource-record-sets \
         --hosted-zone-id "$HOSTED_ZONE_ID" \
-        --query "ResourceRecordSets[?Name == '$RECORD_NAME.$DOMAIN.' && Type == 'CNAME']" \
+        --query "ResourceRecordSets[?Name == '$RECORD_NAME.$TOP_DOMAIN.' && Type == 'CNAME']" \
         --output json)
 
     if [ "$EXISTING_RECORD" = "[]" ]; then
-        echo "L'enregistrement $RECORD_NAME.$DOMAIN n'existe pas. Rien à supprimer."
+        echo "L'enregistrement $RECORD_NAME.$TOP_DOMAIN n'existe pas. Rien à supprimer."
         exit 0
     fi
 
@@ -53,12 +53,12 @@ delete_record() {
     TMP_FILE=$(mktemp)
     cat > "$TMP_FILE" <<EOF
 {
-    "Comment": "Suppression de l'enregistrement $RECORD_NAME.$DOMAIN",
+    "Comment": "Suppression de l'enregistrement $RECORD_NAME.$TOP_DOMAIN",
     "Changes": [
         {
             "Action": "DELETE",
             "ResourceRecordSet": {
-                "Name": "$RECORD_NAME.$DOMAIN",
+                "Name": "$RECORD_NAME.$TOP_DOMAIN",
                 "Type": "CNAME",
                 "TTL": 300,
                 "ResourceRecords": [
@@ -80,7 +80,7 @@ EOF
     # Nettoyer le fichier temporaire
     rm -f "$TMP_FILE"
 
-    echo "Enregistrement DNS $RECORD_NAME.$DOMAIN supprimé"
+    echo "Enregistrement DNS $RECORD_NAME.$TOP_DOMAIN supprimé"
 }
 
 
