@@ -3,14 +3,15 @@
 # Paramètres
 DOMAIN="$1"
 DOMAIN_FOLDER="$2"
-WP_DB_NAME="$3"
-MYSQL_ROOT_USER="$4"
-MYSQL_ROOT_PASSWORD="$5"
-RECORD_NAME="$6" # provient du message SQS
-TOP_DOMAIN="$7" # provient du message SQS
+MYSQL_DB_HOST="$3"
+WP_DB_NAME="$4"
+MYSQL_ROOT_USER="$5"
+MYSQL_ROOT_PASSWORD="$6"
+RECORD_NAME="$7" # provient du message SQS
+TOP_DOMAIN="$8" # provient du message SQS
 
 # 1. Supprimer la base de données
-mysql -h localhost -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
+mysql -h "${MYSQL_DB_HOST}" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS ${WP_DB_NAME};
 DROP USER IF EXISTS '${WP_DB_NAME}_user'@'%';
 FLUSH PRIVILEGES;

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 19 ]; then
+if [ "$#" -ne 22 ]; then
     echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
@@ -28,6 +28,9 @@ RECORD_NAME="${16}" # provient du message SQS
 TOP_DOMAIN="${17}" # provient du message SQS
 ALB_TAG_NAME="${18}" # provient des variables d'environnement
 ALB_TAG_VALUE="${19}" # provient des variables d'environnement
+WP_ZIP_LOCATION="${20}" # provient du message SQS
+WP_DB_DUMP_LOCATION="${21}" # provient du message SQS
+WP_OLD_DOMAIN="${22}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -48,7 +51,7 @@ generate_wordpress_key() {
 
 # Fonction pour vérifier les commandes nécessaires
 check_requirements() {
-    local commands=("wget" "mysql" "systemctl")
+    local commands=("wget" "mysql" "systemctl" "aws" "unzip")
     for cmd in "${commands[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
             echo "Erreur: $cmd n'est pas installé"
@@ -166,6 +169,71 @@ install_wordpress_git() {
     fi
 }
 
+# Fonction pour installer WordPress à partir de fichiers (ZIP + SQL)
+install_wordpress_from_files() {
+    local folder=$1
+    local zip_location=$2
+    local sql_location=$3
+    local db_name=$4
+    local db_user=$5
+    local db_password=$6
+    local db_host=$7
+    local wp_old_domain=$8
+    local wp_new_domain=$9
+
+    echo "Installation de WordPress à partir des fichiers..."
+    
+    # Créer un dossier temporaire
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR" || exit 1
+
+    # Télécharger l'archive WordPress depuis S3
+    echo "Téléchargement de l'archive WordPress depuis ${zip_location}..."
+    aws s3 cp "$zip_location" wordpress.zip
+    if [ $? -ne 0 ]; then
+        echo "Échec du téléchargement de l'archive WordPress"
+        exit 1
+    fi
+
+    # Extraire l'archive
+    echo "Extraction de l'archive..."
+    unzip -q wordpress.zip -d "$folder"
+    rm wordpress.zip
+
+    # Télécharger le dump SQL depuis S3
+    echo "Téléchargement du dump SQL depuis ${sql_location}..."
+    aws s3 cp "$sql_location" database.sql
+    if [ $? -ne 0 ]; then
+        echo "Échec du téléchargement du dump SQL"
+        exit 1
+    fi
+
+    # Ignorer les instructions CREATE DATABASE/USE dans le dump avec sed
+    sed -i '/^CREATE DATABASE/d;/^USE/d' database.sql
+
+    # Remplacer l'ancien domaine par le nouveau domaine
+    if [ -n "$wp_old_domain" ] && [ -n "$wp_new_domain" ]; then
+        echo "Remplacement de l'ancien domaine par le nouveau dans le dump..."
+        sed -i "s/$wp_old_domain/$wp_new_domain/g" database.sql
+    fi
+
+    # Importer la base de données
+    echo "Importation de la base de données..."
+    mysql -h "$db_host" -u "$db_user" -p"$db_password" "$db_name" < database.sql
+    rm database.sql
+
+    echo "WordPress déployé avec succès à partir des fichiers dans ${folder}"
+}
+
+# Configurer la base de données
+echo "Configuration de la base de données MySQL..."
+mysql -h "${MYSQL_DB_HOST}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" <<MYSQL_SCRIPT
+CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
+
 # Installation selon la méthode choisie
 case "$INSTALLATION_METHOD" in
     "standard")
@@ -174,9 +242,18 @@ case "$INSTALLATION_METHOD" in
     "git")
         install_wordpress_git "$WEB_ROOT" "$GIT_REPO_URL" "$GIT_BRANCH" "$GIT_USERNAME" "$GIT_TOKEN"
         ;;
+    "zip_and_sql")
+        if [ -z "$WP_ZIP_LOCATION" ] || [ -z "$WP_DB_DUMP_LOCATION" ]; then
+            echo "Les emplacements des fichiers ZIP et SQL sont requis pour la méthode zip_and_sql"
+            exit 1
+        fi
+        install_wordpress_from_files "$WEB_ROOT" "$WP_ZIP_LOCATION" "$WP_DB_DUMP_LOCATION" \
+                                   "$WP_DB_NAME" "$WP_DB_USER" "$WP_DB_PASSWORD" "$MYSQL_DB_HOST" \
+                                   "$WP_OLD_DOMAIN" "$DOMAIN"
+        ;;
     *)
         echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
-        echo "Utilisez 'standard' ou 'git'"
+        echo "Utilisez 'standard', 'git' ou 'zip_and_sql'"
         exit 1
         ;;
 esac
@@ -223,14 +300,6 @@ EOL
 sudo chown www-data:www-data "${WEB_ROOT}/wp-config.php"
 sudo chmod 644 "${WEB_ROOT}/wp-config.php"
 
-# Configurer la base de données
-echo "Configuration de la base de données MySQL..."
-mysql -h "${MYSQL_DB_HOST}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" <<MYSQL_SCRIPT
-CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
-FLUSH PRIVILEGES;
-MYSQL_SCRIPT
 
 # Configurer OpenLiteSpeed
 echo "Configuration d'OpenLiteSpeed..."

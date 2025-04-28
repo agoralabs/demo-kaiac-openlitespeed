@@ -68,7 +68,10 @@ async function createWordPress(instanceId, message) {
     `"${message.record}"`,
     `"${message.domain}"`,
     `"${process.env.ALB_TAG_NAME || 'Name'}"`,
-    `"${process.env.ALB_TAG_VALUE}"`
+    `"${process.env.ALB_TAG_VALUE}"`,
+    `"${message.wp_zip_location}"`,
+    `"${message.wp_db_dump_location}"`,
+    `"${message.wp_old_domain}"`
   ].join(' ');
 
   console.log('Exécution de la commande SSM:', command);
@@ -95,6 +98,7 @@ async function deleteWordPress(instanceId, message) {
     process.env.DELETE_SCRIPT_COMMAND || '/home/ubuntu/delete_wordpress.sh',
     `"${message.record}.${message.domain}"`,
     `"${message.domain_folder}"`,
+    `"${process.env.MYSQL_DB_HOST || 'localhost'}"`,
     `"${message.wp_db_name}"`,
     `"${process.env.MYSQL_ROOT_USER || 'root'}"`,
     `"${process.env.MYSQL_ROOT_PASSWORD}"`,
