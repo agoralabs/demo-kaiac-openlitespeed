@@ -71,7 +71,9 @@ async function createWordPress(instanceId, message) {
     `"${process.env.ALB_TAG_VALUE}"`,
     `"${message.wp_zip_location}"`,
     `"${message.wp_db_dump_location}"`,
-    `"${message.wp_old_domain}"`
+    `"${message.wp_source_domain}"`,
+    `"${message.wp_source_domain_folder}"`,
+    `"${message.wp_source_db_name}"`
   ].join(' ');
 
   console.log('Exécution de la commande SSM:', command);

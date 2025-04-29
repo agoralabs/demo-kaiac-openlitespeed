@@ -26,7 +26,7 @@ cd /var/www/site1_skyscaledev_com
 zip -r /chemin/vers/site1_skyscaledev_com.zip ./*
 ```
 
-# Pour vérifier que le ZIP contient bien ce que vous voulez
+# Vérifier que le ZIP contient bien ce que vous voulez
 
 ```
 unzip -l site1_skyscaledev_com.zip

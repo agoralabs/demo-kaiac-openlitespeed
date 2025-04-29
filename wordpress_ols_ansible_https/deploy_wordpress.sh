@@ -30,11 +30,14 @@ ALB_TAG_NAME="${18}" # provient des variables d'environnement
 ALB_TAG_VALUE="${19}" # provient des variables d'environnement
 WP_ZIP_LOCATION="${20}" # provient du message SQS
 WP_DB_DUMP_LOCATION="${21}" # provient du message SQS
-WP_OLD_DOMAIN="${22}" # provient du message SQS
+WP_SOURCE_DOMAIN="${22}" # provient du message SQS
+WP_SOURCE_DOMAIN_FOLDER="${23}" # provient du message SQS
+WP_SOURCE_DB_NAME="${24}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
 WEB_ROOT="/var/www/${DOMAIN_FOLDER}"
+WEB_ROOT_SOURCE="/var/www/${WP_SOURCE_DOMAIN_FOLDER}"
 VHOST_CONF="/usr/local/lsws/conf/vhosts/${DOMAIN_FOLDER}/vhconf.conf"
 HTTPD_CONF="/usr/local/lsws/conf/httpd_config.conf"
 
@@ -178,7 +181,7 @@ install_wordpress_from_files() {
     local db_user=$5
     local db_password=$6
     local db_host=$7
-    local wp_old_domain=$8
+    local wp_source_domain=$8
     local wp_new_domain=$9
 
     echo "Installation de WordPress à partir des fichiers..."
@@ -212,9 +215,9 @@ install_wordpress_from_files() {
     sed -i '/^CREATE DATABASE/d;/^USE/d' database.sql
 
     # Remplacer l'ancien domaine par le nouveau domaine
-    if [ -n "$wp_old_domain" ] && [ -n "$wp_new_domain" ]; then
+    if [ -n "$wp_source_domain" ] && [ -n "$wp_new_domain" ]; then
         echo "Remplacement de l'ancien domaine par le nouveau dans le dump..."
-        sed -i "s/$wp_old_domain/$wp_new_domain/g" database.sql
+        sed -i "s/$wp_source_domain/$wp_new_domain/g" database.sql
     fi
 
     # Importer la base de données
@@ -223,6 +226,60 @@ install_wordpress_from_files() {
     rm database.sql
 
     echo "WordPress déployé avec succès à partir des fichiers dans ${folder}"
+}
+
+# Fonction pour copier un site WordPress existant
+copy_wordpress_site() {
+    local target_folder=$1
+    local source_folder=$2
+    local target_db_name=$3
+    local source_db_name=$4
+    local db_user=$5
+    local db_password=$6
+    local db_host=$7
+    local wp_source_domain=$8
+    local wp_new_domain=$9
+
+    echo "Copie du site WordPress depuis ${source_folder} vers ${target_folder}..."
+
+    # 1. Copie des fichiers
+    echo "Copie des fichiers WordPress..."
+    sudo mkdir -p "${target_folder}"
+    sudo rsync -a "${source_folder}/" "${target_folder}/" --exclude="wp-config.php"
+
+    # 2. Copie de la base de données
+    echo "Copie de la base de données ${source_db_name} vers ${target_db_name}..."
+    
+    # Création de la nouvelle base
+#     mysql -h "${db_host}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" <<MYSQL_SCRIPT
+# CREATE DATABASE IF NOT EXISTS ${target_db_name} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+# GRANT ALL PRIVILEGES ON ${target_db_name}.* TO '${db_user}'@'%';
+# FLUSH PRIVILEGES;
+# MYSQL_SCRIPT
+
+    # Export/Import de la base
+    TEMP_SQL_FILE=$(mktemp)
+    mysqldump -h "${db_host}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" "${source_db_name}" > "${TEMP_SQL_FILE}"
+
+    # Ignorer les instructions CREATE DATABASE/USE dans le dump avec sed
+    sed -i '/^CREATE DATABASE/d;/^USE/d' "${TEMP_SQL_FILE}"
+
+    # Remplacer l'ancien domaine par le nouveau domaine
+    if [ -n "$wp_source_domain" ] && [ -n "$wp_new_domain" ]; then
+        echo "Remplacement de l'ancien domaine par le nouveau dans le dump..."
+        sed -i "s/$wp_source_domain/$wp_new_domain/g" "${TEMP_SQL_FILE}"
+    fi
+
+    mysql -h "${db_host}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" "${target_db_name}" < "${TEMP_SQL_FILE}"
+    rm "${TEMP_SQL_FILE}"
+
+#     # 3. Mise à jour des URLs dans la base (si nécessaire)
+#     echo "Mise à jour des URLs dans la base de données..."
+#     mysql -h "${db_host}" -u "${db_user}" -p"${db_password}" "${target_db_name}" <<MYSQL_SCRIPT
+# UPDATE wp_options SET option_value = REPLACE(option_value, '${source_folder}', '${target_folder}') WHERE option_name IN ('siteurl', 'home');
+# MYSQL_SCRIPT
+
+    echo "Copie terminée avec succès."
 }
 
 # Configurer la base de données
@@ -249,11 +306,17 @@ case "$INSTALLATION_METHOD" in
         fi
         install_wordpress_from_files "$WEB_ROOT" "$WP_ZIP_LOCATION" "$WP_DB_DUMP_LOCATION" \
                                    "$WP_DB_NAME" "$WP_DB_USER" "$WP_DB_PASSWORD" "$MYSQL_DB_HOST" \
-                                   "$WP_OLD_DOMAIN" "$DOMAIN"
+                                   "$WP_SOURCE_DOMAIN" "$DOMAIN"
+        ;;
+    "copy")
+        copy_wordpress_site "$WEB_ROOT" "$WEB_ROOT_SOURCE" \
+                            "$WP_DB_NAME" "$WP_SOURCE_DB_NAME" \
+                            "$WP_DB_USER" "$WP_DB_PASSWORD" "$MYSQL_DB_HOST" \
+                            "$WP_SOURCE_DOMAIN" "$DOMAIN"
         ;;
     *)
         echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
-        echo "Utilisez 'standard', 'git' ou 'zip_and_sql'"
+        echo "Utilisez 'standard', 'git', 'zip_and_sql' ou 'copy'"
         exit 1
         ;;
 esac
