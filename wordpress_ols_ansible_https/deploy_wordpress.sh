@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 24 ]; then
+if [ "$#" -ne 25 ]; then
     echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
@@ -33,6 +33,7 @@ WP_DB_DUMP_LOCATION="${21}" # provient du message SQS
 WP_SOURCE_DOMAIN="${22}" # provient du message SQS
 WP_SOURCE_DOMAIN_FOLDER="${23}" # provient du message SQS
 WP_SOURCE_DB_NAME="${24}" # provient du message SQS
+WP_PUSH_LOCATION="${25}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -40,6 +41,15 @@ WEB_ROOT="/var/www/${DOMAIN_FOLDER}"
 WEB_ROOT_SOURCE="/var/www/${WP_SOURCE_DOMAIN_FOLDER}"
 VHOST_CONF="/usr/local/lsws/conf/vhosts/${DOMAIN_FOLDER}/vhconf.conf"
 HTTPD_CONF="/usr/local/lsws/conf/httpd_config.conf"
+#Variables utilisées dans le mode push
+CONFIG_GROUP_NAME=""
+CONFIG_SOURCE_ENV=""
+CONFIG_TARGET_ENV=""
+CONFIG_FILE_SELECTION=""
+CONFIG_SELECTED_FILES=""
+CONFIG_DB_SELECTION=""
+CONFIG_SELECTED_TABLES=""
+CONFIG_PERFORM_SEARCH_REPLACE=""
 
 
 # Fonction pour générer des clés aléatoires sécurisées
@@ -61,6 +71,125 @@ check_requirements() {
             exit 1
         fi
     done
+}
+
+# Fonction pour récupérer et parser la configuration
+get_push_config() {
+    local config_s3_location=$1
+    local temp_file=$(mktemp)
+    
+    echo "Téléchargement de la configuration depuis ${config_s3_location}..."
+    aws s3 cp "$config_s3_location" "$temp_file" || {
+        echo "Erreur lors du téléchargement de la configuration"
+        exit 1
+    }
+
+    # Vérification que jq est installé
+    if ! command -v jq &> /dev/null; then
+        echo "Installation de jq pour le parsing JSON..."
+        sudo apt-get install -y jq
+    fi
+
+    # Extraction des valeurs
+    CONFIG_GROUP_NAME=$(jq -r '.groupName' "$temp_file")
+    CONFIG_SOURCE_ENV=$(jq -r '.sourceEnv' "$temp_file")
+    CONFIG_TARGET_ENV=$(jq -r '.targetEnv' "$temp_file")
+    CONFIG_FILE_SELECTION=$(jq -r '.fileSelection' "$temp_file")
+    CONFIG_SELECTED_FILES=$(jq -r '.selectedFiles[]' "$temp_file" | tr '\n' ' ')
+    CONFIG_DB_SELECTION=$(jq -r '.databaseSelection' "$temp_file")
+    CONFIG_SELECTED_TABLES=$(jq -r '.selectedTables[]' "$temp_file" | tr '\n' ' ')
+    CONFIG_PERFORM_SEARCH_REPLACE=$(jq -r '.performSearchReplace' "$temp_file")
+
+    rm "$temp_file"
+    
+    echo "Configuration chargée:"
+    echo " - Groupe: ${CONFIG_GROUP_NAME}"
+    echo " - Environnement source: ${CONFIG_SOURCE_ENV}"
+    echo " - Environnement cible: ${CONFIG_TARGET_ENV}"
+}
+
+# Fonction pour copier les fichiers selon la configuration
+copy_selected_files() {
+    local source_folder=$1
+    local target_folder=$2
+    
+    echo "Copie des fichiers sélectionnés..."
+    
+    if [ "$CONFIG_FILE_SELECTION" = "all" ]; then
+        echo "Copie de tous les fichiers (sauf wp-config.php)"
+        sudo rsync -a "${source_folder}/" "${target_folder}/" --exclude="wp-config.php"
+    else
+        echo "Copie sélective des fichiers: ${CONFIG_SELECTED_FILES}"
+        for file_path in $CONFIG_SELECTED_FILES; do
+            local source_path="${source_folder}/${file_path}"
+            local target_path="${target_folder}/${file_path}"
+            
+            echo "Copie de ${source_path} vers ${target_path}"
+            sudo mkdir -p "$(dirname "$target_path")"
+            sudo rsync -a "$source_path" "$target_path"
+        done
+    fi
+    
+    echo "Copie des fichiers terminée."
+}
+
+# Fonction pour effectuer le search-replace
+perform_search_replace() {
+    local source_pattern=$1
+    local target_pattern=$2
+    local target_file=$3
+
+    if [ "$CONFIG_PERFORM_SEARCH_REPLACE" = "true" ]; then
+
+        # Ignorer les instructions CREATE DATABASE/USE dans le dump avec sed
+        sed -i '/^CREATE DATABASE/d;/^USE/d' "$target_file"
+
+        # Remplacer l'ancien domaine par le nouveau domaine
+        if [ -n "$source_pattern" ] && [ -n "$target_pattern" ]; then
+            echo "Remplacement des URLs dans le dump SQL..."
+            sed -i "s/$source_pattern/$target_pattern/g" "$target_file"
+        fi
+    fi
+}
+
+# Fonction pour copier les tables de la base de données
+copy_selected_tables() {
+    local source_db=$1
+    local target_db=$2
+    local db_host=$3
+    local source_domain=$4
+    local target_domain=$5
+    
+    echo "Copie des tables sélectionnées..."
+    
+    if [ "$CONFIG_DB_SELECTION" = "all" ]; then
+        echo "Copie de toute la base de données"
+        TEMP_SQL_FILE=$(mktemp)
+        mysqldump -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$source_db" > "$TEMP_SQL_FILE"
+
+        perform_search_replace "$source_domain" "$target_domain" "$TEMP_SQL_FILE"
+
+        mysql -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$target_db" < "$TEMP_SQL_FILE"
+        rm "$TEMP_SQL_FILE"
+    else
+        echo "Copie sélective des tables: ${CONFIG_SELECTED_TABLES}"
+        for table in $CONFIG_SELECTED_TABLES; do
+            echo "Copie de la table ${table}"
+            
+            # Dump de la table
+            TEMP_SQL_FILE=$(mktemp)
+            mysqldump -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$source_db" "$table" > "$TEMP_SQL_FILE"
+
+            perform_search_replace "$source_domain" "$target_domain" "$TEMP_SQL_FILE"
+
+            # Import dans la nouvelle base
+            mysql -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$target_db" < "$TEMP_SQL_FILE"
+            
+            rm "$TEMP_SQL_FILE"
+        done
+    fi
+    
+    echo "Copie des tables terminée."
 }
 
 # Afficher la configuration
@@ -234,11 +363,9 @@ copy_wordpress_site() {
     local source_folder=$2
     local target_db_name=$3
     local source_db_name=$4
-    local db_user=$5
-    local db_password=$6
-    local db_host=$7
-    local wp_source_domain=$8
-    local wp_new_domain=$9
+    local db_host=$5
+    local wp_source_domain=$6
+    local wp_new_domain=$7
 
     echo "Copie du site WordPress depuis ${source_folder} vers ${target_folder}..."
 
@@ -282,14 +409,68 @@ copy_wordpress_site() {
     echo "Copie terminée avec succès."
 }
 
+# Fonction principale pour le mode push
+push_wordpress_site() {
+    local config_s3_location=$1
+    local source_folder=$2
+    local target_folder=$3
+    local source_db=$4
+    local target_db=$5
+    local db_host=$6
+    local source_domain=$7
+    local target_domain=$8
+    
+    # Récupération de la configuration
+    get_push_config "$config_s3_location"
+    
+    # Création de la structure de base
+    sudo mkdir -p "$target_folder"
+    
+    # Copie des fichiers
+    copy_selected_files "$source_folder" "$target_folder"
+    
+    # Création de la base de données
+#     mysql -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
+# CREATE DATABASE IF NOT EXISTS ${target_db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+# GRANT ALL PRIVILEGES ON ${target_db}.* TO '${db_user}'@'%';
+# FLUSH PRIVILEGES;
+# MYSQL_SCRIPT
+
+    # Copie des tables
+    copy_selected_tables "$source_db" "$target_db" "$db_host" "$source_domain" "$target_domain"
+    
+    # Search-replace si nécessaire
+    # perform_search_replace "$target_db" "$db_user" "$db_password" "$db_host" "$source_domain" "$target_domain"
+    
+    # Création du wp-config.php
+#     echo "Configuration de wp-config.php..."
+#     sudo cat > "${target_folder}/wp-config.php" <<EOL
+# <?php
+# define( 'DB_NAME', '${target_db}' );
+# define( 'DB_USER', '${db_user}' );
+# define( 'DB_PASSWORD', '${db_password}' );
+# define( 'DB_HOST', '${db_host}' );
+# [... reste du contenu inchangé ...]
+# EOL
+    
+    # Définition des permissions
+    sudo chown -R www-data:www-data "$target_folder"
+    sudo find "$target_folder" -type d -exec chmod 755 {} \;
+    sudo find "$target_folder" -type f -exec chmod 644 {} \;
+    
+    echo "Déploiement en mode push terminé avec succès."
+}
+
 # Configurer la base de données
 echo "Configuration de la base de données MySQL..."
-mysql -h "${MYSQL_DB_HOST}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" <<MYSQL_SCRIPT
+if [ "$INSTALLATION_METHOD" != "push" ]; then
+    mysql -h "${MYSQL_DB_HOST}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" <<MYSQL_SCRIPT
 CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
+fi
 
 # Installation selon la méthode choisie
 case "$INSTALLATION_METHOD" in
@@ -311,16 +492,22 @@ case "$INSTALLATION_METHOD" in
     "copy")
         copy_wordpress_site "$WEB_ROOT" "$WEB_ROOT_SOURCE" \
                             "$WP_DB_NAME" "$WP_SOURCE_DB_NAME" \
-                            "$WP_DB_USER" "$WP_DB_PASSWORD" "$MYSQL_DB_HOST" \
-                            "$WP_SOURCE_DOMAIN" "$DOMAIN"
+                            "$MYSQL_DB_HOST" "$WP_SOURCE_DOMAIN" "$DOMAIN"             
+        ;;
+    "push")
+        push_wordpress_site "$WP_PUSH_LOCATION" "$SOURCE_DOMAIN_FOLDER" "$DOMAIN_FOLDER" \
+                          "$SOURCE_DB_NAME" "$WP_DB_NAME" \
+                          "$MYSQL_DB_HOST" "$WP_SOURCE_DOMAIN" "$DOMAIN"
         ;;
     *)
         echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
-        echo "Utilisez 'standard', 'git', 'zip_and_sql' ou 'copy'"
+        echo "Utilisez 'standard', 'git', 'zip_and_sql', 'copy' ou 'push'"
         exit 1
         ;;
 esac
 
+
+if [ "$INSTALLATION_METHOD" != "push" ]; then
 # Générer les clés de sécurité
 echo "Génération des clés de sécurité..."
 AUTH_KEY=$(generate_wordpress_key)
@@ -511,7 +698,7 @@ EOF
 
 
 create_record
-
+fi
 
 echo "=== Déploiement terminé avec succès ==="
 echo "URL: http://${DOMAIN}"
