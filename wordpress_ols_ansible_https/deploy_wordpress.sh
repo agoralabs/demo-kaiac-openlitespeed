@@ -142,11 +142,13 @@ perform_search_replace() {
     if [ "$CONFIG_PERFORM_SEARCH_REPLACE" = "true" ]; then
 
         # Ignorer les instructions CREATE DATABASE/USE dans le dump avec sed
+        echo "Ignorer les instructions CREATE DATABASE/USE dans le dump..."
         sed -i '/^CREATE DATABASE/d;/^USE/d' "$target_file"
 
         # Remplacer l'ancien domaine par le nouveau domaine
         if [ -n "$source_pattern" ] && [ -n "$target_pattern" ]; then
             echo "Remplacement des URLs dans le dump SQL..."
+            echo "Remplacement de $source_pattern par $target_pattern dans le dump SQL..."
             sed -i "s/$source_pattern/$target_pattern/g" "$target_file"
         fi
     fi
@@ -462,8 +464,8 @@ push_wordpress_site() {
 }
 
 # Configurer la base de données
-echo "Configuration de la base de données MySQL..."
 if [ "$INSTALLATION_METHOD" != "push" ]; then
+echo "Configuration de la base de données MySQL..."
     mysql -h "${MYSQL_DB_HOST}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" <<MYSQL_SCRIPT
 CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
@@ -495,8 +497,8 @@ case "$INSTALLATION_METHOD" in
                             "$MYSQL_DB_HOST" "$WP_SOURCE_DOMAIN" "$DOMAIN"             
         ;;
     "push")
-        push_wordpress_site "$WP_PUSH_LOCATION" "$SOURCE_DOMAIN_FOLDER" "$DOMAIN_FOLDER" \
-                          "$SOURCE_DB_NAME" "$WP_DB_NAME" \
+        push_wordpress_site "$WP_PUSH_LOCATION" "$WEB_ROOT_SOURCE" "$WEB_ROOT" \
+                          "$WP_SOURCE_DB_NAME" "$WP_DB_NAME" \
                           "$MYSQL_DB_HOST" "$WP_SOURCE_DOMAIN" "$DOMAIN"
         ;;
     *)
