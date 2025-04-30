@@ -1,26 +1,22 @@
 #!/bin/bash
-# Installation ProFTPD avec EFS et ports personnalisés
+# Script d'installation ProFTPD avec EFS et gestion robuste des certificats
 set -e
 
-# === 1. Variables à personnaliser ===
-EFS_MOUNT="/mnt/efs/olsefs"               # Chemin EFS
-FTP_CONFIG_DIR="$EFS_MOUNT/proftpd-config" # Config ProFTPD
-FTP_DATA_DIR="$EFS_MOUNT/ftp-data"         # Dossier données
-TLS_CERT_DIR="/etc/proftpd/ssl"            # Certificats TLS
+# === 1. Configuration ===
+EFS_MOUNT="/mnt/efs/olsefs"
+FTP_CONFIG_DIR="$EFS_MOUNT/proftpd-config"
+FTP_DATA_DIR="$EFS_MOUNT/ftp-data"
+TLS_CERT_DIR="/etc/proftpd/ssl"
 
-# === 2. Paramètres des ports (modifiables) ===
-DEFAULT_FTP_PORT=31001                    # Port FTP/FTPS
-DEFAULT_SFTP_PORT=32002                   # Port SFTP
+# Ports personnalisables (évitent les conflits)
+FTP_PORT=31001
+SFTP_PORT=32002
 
-# Demander les ports si non définis en variables d'environnement
-FTP_PORT=${PROFTPD_FTP_PORT:-$DEFAULT_FTP_PORT}
-SFTP_PORT=${PROFTPD_SFTP_PORT:-$DEFAULT_SFTP_PORT}
-
-# === 3. Vérification des ports disponibles ===
+# === 2. Vérification des ports ===
 check_port() {
     if ss -tuln | grep -q ":$1 "; then
-        echo "ERREUR : Le port $1 est déjà utilisé" >&2
-        ss -tuln | grep ":$1 "
+        echo "ERREUR : Port $1 déjà utilisé par :" >&2
+        ss -tulnp | grep ":$1 "
         exit 1
     fi
 }
@@ -28,43 +24,36 @@ check_port() {
 check_port $FTP_PORT
 check_port $SFTP_PORT
 
-# === 4. Installation des paquets ===
+# === 3. Installation des paquets ===
 sudo apt-get update
 sudo apt-get install -y proftpd-basic proftpd-mod-crypto openssl
 
-# === 5. Préparation des dossiers ===
+# === 4. Préparation des dossiers ===
 sudo mkdir -p "$FTP_CONFIG_DIR" "$FTP_DATA_DIR"
 sudo chmod 755 "$FTP_DATA_DIR"
 
-# === 6. Configuration ProFTPD ===
-if [ ! -f "$FTP_CONFIG_DIR/proftpd.conf" ]; then
-    cat << EOF | sudo tee "$FTP_CONFIG_DIR/proftpd.conf"
-# Config ProFTPD avec ports personnalisés
+# === 5. Configuration ProFTPD ===
+cat << EOF | sudo tee "$FTP_CONFIG_DIR/proftpd.conf" >/dev/null
+# Config ProFTPD avec ports $FTP_PORT (FTP) et $SFTP_PORT (SFTP)
 ServerName "MonServeurFTP"
 ServerType standalone
 DefaultServer on
-Port ${FTP_PORT}
+Port $FTP_PORT
 UseIPv6 off
 
-# Modules
-Include /etc/proftpd/modules.conf
-
-# SFTP
 <IfModule mod_sftp.c>
     SFTPEngine on
     SFTPLog /var/log/proftpd/sftp.log
     SFTPHostKey /etc/ssh/ssh_host_rsa_key
     SFTPHostKey /etc/ssh/ssh_host_ecdsa_key
     SFTPAuthMethods password
-    Port ${SFTP_PORT}
+    Port $SFTP_PORT
 </IfModule>
 
-# Authentification
 AuthOrder mod_auth_unix.c
 RequireValidShell off
 DefaultRoot $FTP_DATA_DIR
 
-# TLS
 <IfModule mod_tls.c>
     TLSEngine on
     TLSRequired on
@@ -73,7 +62,6 @@ DefaultRoot $FTP_DATA_DIR
     TLSRSACertificateKeyFile $TLS_CERT_DIR/proftpd.key
 </IfModule>
 
-# Permissions
 <Directory $FTP_DATA_DIR/*>
     AllowOverwrite on
     <Limit ALL>
@@ -82,43 +70,56 @@ DefaultRoot $FTP_DATA_DIR
 </Directory>
 EOF
 
-    # Certificat auto-signé
-    sudo mkdir -p "$TLS_CERT_DIR"
-    sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -keyout "$TLS_CERT_DIR/proftpd.key" \
-        -out "$TLS_CERT_DIR/proftpd.crt" \
-        -subj "/CN=ftp-server"
-    sudo chmod 600 "$TLS_CERT_DIR"/*
+# === 6. Génération des certificats (nouvelle méthode robuste) ===
+sudo mkdir -p "$TLS_CERT_DIR"
+sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout "$TLS_CERT_DIR/proftpd.key" \
+    -out "$TLS_CERT_DIR/proftpd.crt" \
+    -subj "/C=FR/ST=Paris/L=Paris/O=MyCompany/CN=ftp-$(hostname)" \
+    -addext "subjectAltName=DNS:$(hostname)"
+
+sudo chmod 600 "$TLS_CERT_DIR"/*
+sudo chown root:root "$TLS_CERT_DIR"/*
+
+# === 7. Vérification des certificats ===
+if ! sudo openssl x509 -noout -in "$TLS_CERT_DIR/proftpd.crt"; then
+    echo "ERREUR: Échec de la génération du certificat" >&2
+    exit 1
 fi
 
-# === 7. Lien symbolique et activation ===
+# === 8. Lien symbolique ===
 sudo ln -sf "$FTP_CONFIG_DIR/proftpd.conf" /etc/proftpd/proftpd.conf
-echo "LoadModule mod_sftp.c" | sudo tee -a /etc/proftpd/modules.conf
-echo "LoadModule mod_tls.c" | sudo tee -a /etc/proftpd/modules.conf
 
-# === 8. Création utilisateur exemple ===
-EXAMPLE_USER="client1"
-if ! id "$EXAMPLE_USER" &>/dev/null; then
-    sudo adduser --disabled-password --gecos "" "$EXAMPLE_USER"
-    sudo mkdir -p "$FTP_DATA_DIR/$EXAMPLE_USER"
-    sudo chown "$EXAMPLE_USER:$EXAMPLE_USER" "$FTP_DATA_DIR/$EXAMPLE_USER"
-    echo "Utilisateur exemple: $EXAMPLE_USER"
-    echo "Pour définir un mot de passe: sudo passwd $EXAMPLE_USER"
+# === 9. Activation des modules ===
+echo -e "LoadModule mod_sftp.c\nLoadModule mod_tls.c" | sudo tee -a /etc/proftpd/modules.conf
+
+# === 10. Création utilisateur test ===
+EXAMPLE_USER="ftpuser_$(date +%s | tail -c 4)"
+sudo adduser --system --group --shell /bin/false --home "$FTP_DATA_DIR/$EXAMPLE_USER" "$EXAMPLE_USER"
+sudo mkdir -p "$FTP_DATA_DIR/$EXAMPLE_USER/www"
+sudo chown -R "$EXAMPLE_USER:$EXAMPLE_USER" "$FTP_DATA_DIR/$EXAMPLE_USER"
+echo "Mot de passe pour $EXAMPLE_USER :"
+sudo passwd "$EXAMPLE_USER"
+
+# === 11. Ouverture des ports ===
+sudo ufw allow $FTP_PORT/tcp
+sudo ufw allow $SFTP_PORT/tcp
+
+# === 12. Démarrage sécurisé ===
+sudo systemctl daemon-reload
+sudo systemctl enable proftpd
+if ! sudo systemctl restart proftpd; then
+    echo "=== DÉBOGAGE ==="
+    sudo journalctl -u proftpd -n 20 --no-pager
+    exit 1
 fi
 
-# === 9. Ouverture des ports ===
-sudo ufw allow ${FTP_PORT}/tcp
-sudo ufw allow ${SFTP_PORT}/tcp
-
-# === 10. Démarrer le service ===
-sudo systemctl enable proftpd
-sudo systemctl restart proftpd
-
-# === Résumé ===
-echo "=== Installation terminée ==="
-echo "Port FTP/FTPS: ${FTP_PORT}"
-echo "Port SFTP: ${SFTP_PORT}"
-echo "Config: ${FTP_CONFIG_DIR}/proftpd.conf"
+# === 13. Vérification finale ===
+echo "=== INSTALLATION RÉUSSIE ==="
+echo "Port FTP/FTPS: $FTP_PORT"
+echo "Port SFTP: $SFTP_PORT"
+echo "Utilisateur test: $EXAMPLE_USER"
+echo "Certificat TLS: $TLS_CERT_DIR/proftpd.crt"
 echo "Test de connexion:"
-echo "  SFTP: sftp -P ${SFTP_PORT} ${EXAMPLE_USER}@$(hostname -I | awk '{print $1}')"
-echo "  FTPS: lftp -u ${EXAMPLE_USER} -p ${FTP_PORT} ftps://$(hostname -I | awk '{print $1}')"
+echo "  SFTP: sftp -P $SFTP_PORT $EXAMPLE_USER@$(curl -s ifconfig.me)"
+echo "  FTPS: lftp -u $EXAMPLE_USER -p $FTP_PORT ftps://$(curl -s ifconfig.me)"

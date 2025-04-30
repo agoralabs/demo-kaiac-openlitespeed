@@ -86,8 +86,8 @@ Vous pourriez aussi automatiser la création des comptes via un script lorsque u
 
 # Téléchargement des scripts sh
 
-curl -o delete_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/deploy_proftpd.sh
+curl -o deploy_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/deploy_proftpd.sh
 
-curl -o delete_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/create_user_proftpd.sh
+curl -o create_user_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/create_user_proftpd.sh
 
-curl -o delete_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/uninstall_proftpd.sh
+curl -o uninstall_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/uninstall_proftpd.sh
