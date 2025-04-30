@@ -1,6 +1,6 @@
 #!/bin/bash
-# Script de création d'utilisateur FTP/SFTP avec paramètres personnalisés
-# Usage: sudo ./creer-utilisateur-ftp.sh [login] [password] [/chemin/absolu/home]
+# Script de création d'utilisateur SFTP avec home directory = répertoire WordPress
+# Usage: sudo ./creer-utilisateur-ftp.sh [login] [password] [/chemin/absolu/wordpress]
 
 set -euo pipefail
 
@@ -16,15 +16,20 @@ fi
 
 # === Validation des arguments ===
 if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 [login] [password] [/chemin/absolu/home]"
-    echo "Exemple: $0 site4_skyscaledev_com_ftp_usr MonP@ssw0rd! /var/www/site4_skyscaledev_com"
+    echo "Usage: $0 [login] [password] [/chemin/absolu/wordpress]"
+    echo "Exemple: $0 site4_ftp MonP@ssw0rd! /var/www/site4/wp-content"
     exit 1
 fi
 
 LOGIN="$1"
 PASSWORD="$2"
-HOME_DIR="$3"
+WP_DIR="$3"
 
+# === Vérification du répertoire WordPress ===
+if [ ! -d "$WP_DIR" ]; then
+    echo "ERREUR: Le répertoire WordPress $WP_DIR n'existe pas" >&2
+    exit 1
+fi
 
 # === Création du groupe si inexistant ===
 if ! getent group "$DEFAULT_GROUP" >/dev/null; then
@@ -52,27 +57,21 @@ useradd \
     --system \
     --uid "$NEW_UID" \
     --gid "$DEFAULT_GROUP" \
-    --home-dir "$HOME_DIR" \
+    --home-dir "$WP_DIR" \  # Le home devient directement le répertoire WordPress
     --shell /bin/false \
     "$LOGIN"
 
 echo "$LOGIN:$PASSWORD" | chpasswd
 
-# === Création de l'arborescence ===
-mkdir -p "$HOME_DIR"
-chown "$LOGIN:$DEFAULT_GROUP" "$HOME_DIR"
-chmod 750 "$HOME_DIR"
+# === Configuration des permissions ===
+chown -R "$LOGIN:$DEFAULT_GROUP" "$WP_DIR"
+find "$WP_DIR" -type d -exec chmod 750 {} \;
+find "$WP_DIR" -type f -exec chmod 640 {} \;
 
-# Dossier WordPress par défaut
-WP_DIR="$HOME_DIR/www"
-mkdir -p "$WP_DIR"
-chown "$LOGIN:$DEFAULT_GROUP" "$WP_DIR"
-chmod 770 "$WP_DIR"
-
-# === Configuration ProFTPD (si nécessaire) ===
+# === Configuration ProFTPD ===
 if [ -d /etc/proftpd/conf.d ]; then
     cat > "/etc/proftpd/conf.d/$LOGIN.conf" <<EOF
-<Directory "$HOME_DIR">
+<Directory "$WP_DIR">
     <Limit ALL>
         AllowUser $LOGIN
     </Limit>
@@ -86,8 +85,7 @@ log "Utilisateur $LOGIN créé avec UID $NEW_UID"
 echo "=== CRÉATION RÉUSSIE ==="
 echo "Login: $LOGIN"
 echo "Mot de passe: $PASSWORD"
-echo "Home directory: $HOME_DIR"
-echo "Dossier WordPress: $WP_DIR"
+echo "Répertoire WordPress: $WP_DIR"
 echo "UID/GID: $NEW_UID/$(getent group "$DEFAULT_GROUP" | cut -d: -f3)"
 echo "Connectez-vous avec:"
 echo "sftp -P 22 $LOGIN@$(hostname -I | awk '{print $1}')"

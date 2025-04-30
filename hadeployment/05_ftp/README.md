@@ -91,3 +91,13 @@ curl -o deploy_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac
 curl -o create_user_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/create_user_proftpd.sh
 
 curl -o uninstall_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/uninstall_proftpd.sh
+
+
+# === INSTALLATION RÉUSSIE ===
+Port FTP/FTPS: 31001
+Port SFTP: 32002
+Utilisateur test: ftpuser_293
+Certificat TLS: /etc/proftpd/ssl/proftpd.crt
+Test de connexion:
+  SFTP: sftp -P 32002 ftpuser_293@35.88.184.231
+  FTPS: lftp -u ftpuser_293 -p 31001 ftps://35.88.184.231
