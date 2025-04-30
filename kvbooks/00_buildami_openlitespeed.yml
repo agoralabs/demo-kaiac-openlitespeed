@@ -129,6 +129,7 @@
           - curl
           - gnupg
           - ca-certificates
+          - openssh-server
         state: present
         update_cache: yes
 
