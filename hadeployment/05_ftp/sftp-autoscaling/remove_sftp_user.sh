@@ -8,6 +8,7 @@ set -euo pipefail
 PARAMETER_PATH="/sftp/users"
 LOG_FILE="/var/log/sftp_management.log"
 ASG_NAME="ols-web-prod-asg"
+SFTP_SYNC_REMOVE_USER_SCRIPT="/home/ubuntu/sftp_sync_remove_user.sh"
 
 # === Fonction de journalisation ===
 log() {
@@ -46,28 +47,6 @@ aws ssm put-parameter --name "$PARAMETER_PATH" --type "SecureString" --value "$U
 
 log "Utilisateur $USERNAME supprimé du paramètre SSM"
 
-# === Créer un script de suppression pour toutes les instances ===
-TEMP_SCRIPT=$(mktemp)
-cat > "$TEMP_SCRIPT" <<EOF
-#!/bin/bash
-# Script temporaire de suppression d'utilisateur SFTP
-
-# Vérifier si l'utilisateur existe
-if id "$USERNAME" &>/dev/null; then
-    # Démonter le répertoire www s'il est monté
-    if grep -q "/home/$USERNAME/www" /etc/fstab; then
-        umount "/home/$USERNAME/www" 2>/dev/null || true
-        sed -i "\|/home/$USERNAME/www|d" /etc/fstab
-    fi
-    
-    # Supprimer l'utilisateur et son répertoire home
-    userdel -r "$USERNAME" 2>/dev/null || true
-    echo "Utilisateur $USERNAME supprimé"
-else
-    echo "L'utilisateur $USERNAME n'existe pas sur cette instance"
-fi
-EOF
-
 # === Synchroniser la suppression sur toutes les instances ===
 log "Déclenchement de la suppression sur toutes les instances..."
 
@@ -75,12 +54,9 @@ log "Suppression de l'utilisateur sur le groupe d'autoscaling $ASG_NAME..."
 aws ssm send-command \
     --document-name "AWS-RunShellScript" \
     --targets "Key=tag:aws:autoscaling:groupName,Values=$ASG_NAME" \
-    --parameters commands="$(cat $TEMP_SCRIPT)" \
-    --comment "Suppression de l'utilisateur SFTP $USERNAME" \
+    --parameters commands="$SFTP_SYNC_REMOVE_USER_SCRIPT $USERNAME" \
+    --comment "Synchronisation des utilisateurs SFTP" \
     --output text
-
-# Nettoyer le script temporaire
-rm -f "$TEMP_SCRIPT"
 
 log "Utilisateur SFTP $USERNAME supprimé avec succès"
 echo ""
