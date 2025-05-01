@@ -7,6 +7,7 @@ set -euo pipefail
 # === Configuration ===
 PARAMETER_PATH="/sftp/users"
 LOG_FILE="/var/log/sftp_management.log"
+ASG_NAME="ols-web-prod-asg"
 
 # === Fonction de journalisation ===
 log() {
@@ -70,23 +71,13 @@ EOF
 # === Synchroniser la suppression sur toutes les instances ===
 log "Déclenchement de la suppression sur toutes les instances..."
 
-# Obtenir la liste des groupes d'autoscaling
-ASG_LIST=$(aws autoscaling describe-auto-scaling-groups --query "AutoScalingGroups[].AutoScalingGroupName" --output text)
-
-if [ -n "$ASG_LIST" ]; then
-    for ASG in $ASG_LIST; do
-        log "Suppression de l'utilisateur sur le groupe d'autoscaling $ASG..."
-        aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:aws:autoscaling:groupName,Values=$ASG" \
-            --parameters commands="$(cat $TEMP_SCRIPT)" \
-            --comment "Suppression de l'utilisateur SFTP $USERNAME" \
-            --output text
-    done
-else
-    log "Aucun groupe d'autoscaling trouvé, suppression sur l'instance locale uniquement"
-    bash "$TEMP_SCRIPT"
-fi
+log "Suppression de l'utilisateur sur le groupe d'autoscaling $ASG..."
+aws ssm send-command \
+    --document-name "AWS-RunShellScript" \
+    --targets "Key=tag:aws:autoscaling:groupName,Values=$ASG_NAME" \
+    --parameters commands="$(cat $TEMP_SCRIPT)" \
+    --comment "Suppression de l'utilisateur SFTP $USERNAME" \
+    --output text
 
 # Nettoyer le script temporaire
 rm -f "$TEMP_SCRIPT"

@@ -99,6 +99,8 @@ curl -o add_sftp_user.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-
 
 curl -o sync_sftp_users.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/sync_sftp_users.sh
 
+curl -o remove_sftp_user.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/remove_sftp_user.sh
+
 # === INSTALLATION RÉUSSIE ===
 Port FTP/FTPS: 31001
 Port SFTP: 32002
