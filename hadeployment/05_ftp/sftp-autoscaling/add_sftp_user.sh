@@ -9,6 +9,7 @@ PARAMETER_PATH="/sftp/users"
 LOG_FILE="/var/log/sftp_management.log"
 WP_ROOT="/var/www"
 SFTP_SYNC_USERS_SCRIPT="/home/ubuntu/sync_sftp_users.sh"
+ASG_NAME="ols-web-prod-asg"
 
 # === Fonction de journalisation ===
 log() {
@@ -72,22 +73,15 @@ log "Utilisateur $USERNAME ajouté au paramètre SSM"
 log "Déclenchement de la synchronisation sur toutes les instances..."
 
 # Obtenir la liste des groupes d'autoscaling
-ASG_LIST=$(aws autoscaling describe-auto-scaling-groups --query "AutoScalingGroups[].AutoScalingGroupName" --output text)
+# ASG_LIST=$(aws autoscaling describe-auto-scaling-groups --query "AutoScalingGroups[].AutoScalingGroupName" --output text)
 
-if [ -n "$ASG_LIST" ]; then
-    for ASG in $ASG_LIST; do
-        log "Synchronisation des utilisateurs sur le groupe d'autoscaling $ASG..."
-        aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:aws:autoscaling:groupName,Values=$ASG" \
-            --parameters commands="$SFTP_SYNC_USERS_SCRIPT" \
-            --comment "Synchronisation des utilisateurs SFTP" \
-            --output text
-    done
-else
-    log "Aucun groupe d'autoscaling trouvé, synchronisation sur l'instance locale uniquement"
-    $SFTP_SYNC_USERS_SCRIPT
-fi
+log "Synchronisation des utilisateurs sur le groupe d'autoscaling $ASG_NAME..."
+aws ssm send-command \
+    --document-name "AWS-RunShellScript" \
+    --targets "Key=tag:aws:autoscaling:groupName,Values=$ASG_NAME" \
+    --parameters commands="$SFTP_SYNC_USERS_SCRIPT" \
+    --comment "Synchronisation des utilisateurs SFTP" \
+    --output text
 
 log "Utilisateur SFTP $USERNAME créé avec succès pour le site $SITE_NAME"
 echo ""
