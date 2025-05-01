@@ -52,7 +52,7 @@ CONFIG_SELECTED_FILES=""
 CONFIG_DB_SELECTION=""
 CONFIG_SELECTED_TABLES=""
 CONFIG_PERFORM_SEARCH_REPLACE=""
-
+WP_SFTP_ADD_USER_SCRIPT="/home/ubuntu/add_sftp_user.sh"
 
 # Fonction pour générer des clés aléatoires sécurisées
 generate_wordpress_key() {
@@ -708,10 +708,10 @@ fi
 # Créer un utilisateur SFTP
 if [ "$INSTALLATION_METHOD" != "push" ]; then
 
-    if [ -f "./add_sftp_user.sh" ]; then
-        ./add_sftp_user.sh "$DOMAIN_FOLDER" "$WP_SFTP_USER" "$WP_SFTP_PWD"
+    if [ -f "$WP_SFTP_ADD_USER_SCRIPT" ]; then
+        $WP_SFTP_ADD_USER_SCRIPT "$DOMAIN_FOLDER" "$WP_SFTP_USER" "$WP_SFTP_PWD"
     else
-        echo "Le script add_sftp_user.sh n'est pas présent dans le répertoire courant."
+        echo "Le script d'ajout d'utilisateur SFTP $WP_SFTP_ADD_USER_SCRIPT n'est pas présent."
     fi
 fi
 

@@ -11,6 +11,9 @@ RECORD_NAME="$7" # provient du message SQS
 TOP_DOMAIN="$8" # provient du message SQS
 WP_SFTP_USER="$9" # provient du message SQS
 
+# Variables
+WP_SFTP_REMOVE_USER_SCRIPT="/home/ubuntu/remove_sftp_user.sh"
+
 # 1. Supprimer la base de données
 mysql -h "${MYSQL_DB_HOST}" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS ${WP_DB_NAME};
@@ -89,10 +92,10 @@ EOF
 delete_record
 
 # Supprimer l'utilisateur SFTP
-if [ -f "./remove_sftp_user.sh" ]; then
-    ./remove_sftp_user.sh "$WP_SFTP_USER"
+if [ -f "$WP_SFTP_REMOVE_USER_SCRIPT" ]; then
+    $WP_SFTP_REMOVE_USER_SCRIPT "$WP_SFTP_USER"
 else
-    echo "Le script remove_sftp_user.sh n'est pas présent dans le répertoire courant."
+    echo "Le script de suppression de l'utilisateur SFTP $WP_SFTP_REMOVE_USER_SCRIPT n'est pas présent."
 fi
 
 echo "Suppression de ${DOMAIN} terminée"
