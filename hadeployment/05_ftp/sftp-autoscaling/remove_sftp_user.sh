@@ -71,7 +71,7 @@ EOF
 # === Synchroniser la suppression sur toutes les instances ===
 log "Déclenchement de la suppression sur toutes les instances..."
 
-log "Suppression de l'utilisateur sur le groupe d'autoscaling $ASG..."
+log "Suppression de l'utilisateur sur le groupe d'autoscaling $ASG_NAME..."
 aws ssm send-command \
     --document-name "AWS-RunShellScript" \
     --targets "Key=tag:aws:autoscaling:groupName,Values=$ASG_NAME" \
