@@ -8,7 +8,7 @@ set -euo pipefail
 PARAMETER_PATH="/sftp/users"
 LOG_FILE="/var/log/sftp_management.log"
 ASG_NAME="ols-web-prod-asg"
-SFTP_SYNC_REMOVE_USER_SCRIPT="/home/ubuntu/sftp_sync_remove_user.sh"
+SFTP_SYNC_REMOVE_USER_SCRIPT="/home/ubuntu/sync_remove_sftp_user.sh"
 
 # === Fonction de journalisation ===
 log() {
