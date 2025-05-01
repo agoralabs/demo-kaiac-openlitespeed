@@ -74,7 +74,9 @@ async function createWordPress(instanceId, message) {
     `"${message.wp_source_domain}"`,
     `"${message.wp_source_domain_folder}"`,
     `"${message.wp_source_db_name}"`,
-    `"${message.wp_push_location}"`
+    `"${message.wp_push_location}"`,
+    `"${message.ftp_user}"`,
+    `"${message.ftp_pwd}"`
   ].join(' ');
 
   console.log('Exécution de la commande SSM:', command);
@@ -106,7 +108,8 @@ async function deleteWordPress(instanceId, message) {
     `"${process.env.MYSQL_ROOT_USER || 'root'}"`,
     `"${process.env.MYSQL_ROOT_PASSWORD}"`,
     `"${message.record}"`,
-    `"${message.domain}"`
+    `"${message.domain}"`,
+    `"${message.ftp_user}"`
   ].join(' ');
 
   console.log('Exécution de la commande de suppression:', command);

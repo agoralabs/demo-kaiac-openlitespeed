@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 25 ]; then
+if [ "$#" -ne 27 ]; then
     echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
@@ -34,6 +34,8 @@ WP_SOURCE_DOMAIN="${22}" # provient du message SQS
 WP_SOURCE_DOMAIN_FOLDER="${23}" # provient du message SQS
 WP_SOURCE_DB_NAME="${24}" # provient du message SQS
 WP_PUSH_LOCATION="${25}" # provient du message SQS
+WP_SFTP_USER="${26}" # provient du message SQS
+WP_SFTP_PWD="${27}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -700,6 +702,17 @@ EOF
 
 
 create_record
+fi
+
+
+# Créer un utilisateur SFTP
+if [ "$INSTALLATION_METHOD" != "push" ]; then
+
+    if [ -f "./add_sftp_user.sh" ]; then
+        ./add_sftp_user.sh "$DOMAIN_FOLDER" "$WP_SFTP_USER" "$WP_SFTP_PWD"
+    else
+        echo "Le script add_sftp_user.sh n'est pas présent dans le répertoire courant."
+    fi
 fi
 
 echo "=== Déploiement terminé avec succès ==="

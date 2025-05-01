@@ -9,6 +9,7 @@ MYSQL_ROOT_USER="$5"
 MYSQL_ROOT_PASSWORD="$6"
 RECORD_NAME="$7" # provient du message SQS
 TOP_DOMAIN="$8" # provient du message SQS
+WP_SFTP_USER="$9" # provient du message SQS
 
 # 1. Supprimer la base de données
 mysql -h "${MYSQL_DB_HOST}" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
@@ -86,5 +87,12 @@ EOF
 
 
 delete_record
+
+# Supprimer l'utilisateur SFTP
+if [ -f "./remove_sftp_user.sh" ]; then
+    ./remove_sftp_user.sh "$WP_SFTP_USER"
+else
+    echo "Le script remove_sftp_user.sh n'est pas présent dans le répertoire courant."
+fi
 
 echo "Suppression de ${DOMAIN} terminée"
