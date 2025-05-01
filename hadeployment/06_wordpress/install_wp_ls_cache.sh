@@ -10,6 +10,6 @@ fi
 WEB_ROOT="$1"
 
 cd $WEB_ROOT  # Adaptez le chemin
-wp plugin install litespeed-cache --activate
-wp option update litespeed-cache-conf '[{"_id":"cache","enabled":"1"}]' --format=json
+wp plugin install litespeed-cache --activate --allow-root
+wp option update litespeed-cache-conf '[{"_id":"cache","enabled":"1"}]' --format=json --allow-root
 echo "LSCache installé et activé !"
