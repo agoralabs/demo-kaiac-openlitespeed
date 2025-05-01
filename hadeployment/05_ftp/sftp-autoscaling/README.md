@@ -248,3 +248,22 @@ Cette solution garantit que:
 • Les informations d'authentification sont stockées de manière sécurisée
 • Toutes les instances ont accès aux mêmes utilisateurs
 • Les fichiers WordPress sont partagés via EFS
+
+# Téléchargement des scripts sh
+
+curl -o deploy_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/deploy_proftpd.sh
+
+curl -o create_user_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/create_user_proftpd.sh
+
+curl -o uninstall_proftpd.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/uninstall_proftpd.sh
+
+
+curl -o deploy_sftp.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/deploy_sftp.sh
+
+curl -o add_sftp_user.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/add_sftp_user.sh
+
+curl -o sync_sftp_users.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/sync_sftp_users.sh
+
+curl -o remove_sftp_user.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/remove_sftp_user.sh
+
+curl -o sync_remove_sftp_user.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/sync_remove_sftp_user.sh
