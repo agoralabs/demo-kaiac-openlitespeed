@@ -13,3 +13,5 @@ cd $WEB_ROOT  # Adaptez le chemin
 wp plugin install litespeed-cache --activate --allow-root
 wp option update litespeed-cache-conf '[{"_id":"cache","enabled":"1"}]' --format=json --allow-root
 echo "LSCache installé et activé !"
+
+# curl -I https://site1.skyscaledev.com | grep x-litespeed-cache
