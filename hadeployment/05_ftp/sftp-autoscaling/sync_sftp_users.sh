@@ -5,7 +5,7 @@ set -euo pipefail
 
 # Variables
 SFTP_GROUP="sftpusers"
-WP_ROOT="/usr/local/lsws/wordpress"
+WP_ROOT="/var/www"
 PARAMETER_PATH="/sftp/users"
 LOG_FILE="/var/log/sftp_sync.log"
 
@@ -51,18 +51,18 @@ echo "$USERS_JSON" | jq -c '.[]' 2>/dev/null | while read -r user; do
         fi
         
         # Créer le répertoire www
-        mkdir -p "/home/$username/www"
+        # mkdir -p "/home/$username/www"
         
         # Configurer le bind mount
-        if ! grep -q "$wp_dir /home/$username/www" /etc/fstab; then
-            echo "$wp_dir /home/$username/www none bind 0 0" >> /etc/fstab
-            mount --bind "$wp_dir" "/home/$username/www"
-            log "Montage bind configuré: $wp_dir -> /home/$username/www"
-        fi
+        # if ! grep -q "$wp_dir /home/$username/www" /etc/fstab; then
+        #     echo "$wp_dir /home/$username/www none bind 0 0" >> /etc/fstab
+        #     mount --bind "$wp_dir" "/home/$username/www"
+        #     log "Montage bind configuré: $wp_dir -> /home/$username/www"
+        # fi
         
         # Ajuster les permissions
         chown -R "$username:$username" "$wp_dir"
-        chown "$username:$username" "/home/$username/www"
+        # chown "$username:$username" "/home/$username/www"
         chmod -R 755 "$wp_dir"
         
         log "Utilisateur SFTP $username créé avec succès"
