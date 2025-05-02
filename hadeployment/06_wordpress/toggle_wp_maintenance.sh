@@ -95,7 +95,6 @@ add_wp_hook() {
     # Ajouter le hook amélioré
     if ! grep -q "custom_maintenance_mode" "$HOOK_FILE"; then
         cat << 'EOF' >> "$HOOK_FILE"
-<?php
 // Maintenance Mode Hook
 add_action('template_redirect', function() {
     $maintenance_file = get_template_directory().'/maintenance-page.php';
