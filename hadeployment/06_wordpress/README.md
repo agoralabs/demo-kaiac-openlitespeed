@@ -86,6 +86,11 @@ curl -o install_wp_cli.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac
 
 curl -o install_wp_ls_cache.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/install_wp_ls_cache.sh
 
+curl -o disable_wp_ls_cache.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/disable_wp_ls_cache.sh
+
+
+
+curl -o toggle_wp_maintenance.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/toggle_wp_maintenance.sh
 
 # Résultat activation LS Cache
 

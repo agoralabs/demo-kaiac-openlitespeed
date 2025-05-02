@@ -12,6 +12,9 @@ THEME_DIR="${WEB_ROOT}/wp-content/themes/$ACTIVE_THEME_NAME"
 MAINTENANCE_HTML="${THEME_DIR}/maintenance-page.php"
 LSCACHE_EXCLUSION="/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/maintenance-exclude.conf"  # Chemin de configuration OpenLiteSpeed
 
+# Préparation du folder de config du vhost
+mkdir -p "/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/"
+
 # Vérification des dépendances
 if [ ! -f "/usr/local/lsws/bin/lswsctrl" ]; then
     echo "Erreur : OpenLiteSpeed n'est pas installé ou le chemin est incorrect."
