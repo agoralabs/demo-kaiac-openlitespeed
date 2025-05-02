@@ -82,23 +82,46 @@ add_wp_hook() {
     if [ ! -f "$HOOK_FILE" ]; then
         touch "$HOOK_FILE"
         chown www-data:www-data "$HOOK_FILE"
+        chmod 644 "$HOOK_FILE"
     fi
 
+    # Activer le debug temporairement
+    if ! grep -q "WP_DEBUG" "$WEB_ROOT/wp-config.php"; then
+        wp config set WP_DEBUG true --raw --path="$WEB_ROOT" --allow-root
+        wp config set WP_DEBUG_LOG true --raw --path="$WEB_ROOT" --allow-root
+        wp config set WP_DEBUG_DISPLAY false --raw --path="$WEB_ROOT" --allow-root
+    fi
+
+    # Ajouter le hook amélioré
     if ! grep -q "custom_maintenance_mode" "$HOOK_FILE"; then
         cat << 'EOF' >> "$HOOK_FILE"
 <?php
-// Mode maintenance activé par script
-function custom_maintenance_mode() {
-    if (!current_user_can('administrator')) {
+// Maintenance Mode Hook
+add_action('template_redirect', function() {
+    $maintenance_file = get_template_directory().'/maintenance-page.php';
+    
+    // DEBUG: Vérifiez ces valeurs dans les logs
+    error_log("[MAINTENANCE] Current user can admin: ".current_user_can('administrator'));
+    error_log("[MAINTENANCE] File exists: ".file_exists($maintenance_file));
+    
+    if (!current_user_can('administrator') && file_exists($maintenance_file)) {
         header('HTTP/1.1 503 Service Temporarily Unavailable');
+        header('Content-Type: text/html; charset=UTF-8');
         header('Retry-After: 3600');
-        include(get_template_directory() . '/maintenance-page.php');
+        include($maintenance_file);
         exit();
     }
-}
-add_action('template_redirect', 'custom_maintenance_mode', 1);
+}, 1);
 EOF
         echo "→ Hook ajouté à $HOOK_FILE"
+    fi
+
+    # Créer le fichier debug.log si inexistant
+    DEBUG_LOG="$WEB_ROOT/wp-content/debug.log"
+    if [ ! -f "$DEBUG_LOG" ]; then
+        touch "$DEBUG_LOG"
+        chown www-data:www-data "$DEBUG_LOG"
+        chmod 666 "$DEBUG_LOG"
     fi
 }
 
@@ -108,8 +131,8 @@ configure_lscache() {
 RewriteCond %{DOCUMENT_ROOT}/wp-content/themes/*/maintenance-page.php -f
 RewriteRule .* - [E=Cache-Control:no-cache]
 EOF
-    /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1
-    echo "→ Configuration LSCache mise à jour"
+    /usr/local/lsws/bin/lswsctrl restart >/dev/null 2>&1
+    echo "→ Configuration LSCache mise à jour (serveur restarté)"
 }
 
 disable_maintenance() {
@@ -120,8 +143,8 @@ disable_maintenance() {
         sed -i '/custom_maintenance_mode/,/add_action/d' "$THEME_DIR/functions.php"
     fi
     
-    /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1
-    echo "→ Maintenance désactivée"
+    /usr/local/lsws/bin/lswsctrl restart >/dev/null 2>&1
+    echo "→ Maintenance désactivée (serveur restarté)"
 }
 
 # Exécution principale
@@ -133,6 +156,7 @@ case "$MAINTENANCE_MODE" in
         add_wp_hook
         configure_lscache
         echo "✅ Maintenance ACTIVÉE avec succès"
+        echo "Pour vérifier les logs : tail -f $WEB_ROOT/wp-content/debug.log"
         ;;
     off)
         echo "Désactivation du mode maintenance pour $WP_SITE_NAME"
