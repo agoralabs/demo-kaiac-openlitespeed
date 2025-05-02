@@ -8,8 +8,8 @@ WP_SITE_NAME="$2" # ex. site1_skyscaledev_com
 WEB_ROOT="/var/www/$WP_SITE_NAME"  # Chemin vers la racine WordPress
 ACTIVE_THEME_NAME=$(wp option get stylesheet --path=${WEB_ROOT} --allow-root) # Thème actif
 wp option get stylesheet --path=${WEB_ROOT} --allow-root
-THEME_DIR="${WEB_ROOT}/wp-content/themes/$ACTIVE_THEME_NAME" 
-MAINTENANCE_HTML="${THEME_DIR}/maintenance-page.php"
+THEME_DIR="$WEB_ROOT/wp-content/themes/$ACTIVE_THEME_NAME" 
+MAINTENANCE_HTML="THEME_DIR/maintenance-page.php"
 LSCACHE_EXCLUSION="/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/maintenance-exclude.conf"  # Chemin de configuration OpenLiteSpeed
 
 # Préparation du folder de config du vhost
