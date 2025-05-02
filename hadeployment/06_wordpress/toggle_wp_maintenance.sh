@@ -135,15 +135,33 @@ EOF
 }
 
 disable_maintenance() {
+    # Suppression des fichiers
     [ -f "$MAINTENANCE_HTML" ] && rm -f "$MAINTENANCE_HTML"
     [ -f "$LSCACHE_EXCLUSION" ] && rm -f "$LSCACHE_EXCLUSION"
     
+    # Suppression robuste du hook
     if [ -f "$THEME_DIR/functions.php" ]; then
-        sed -i '/custom_maintenance_mode/,/add_action/d' "$THEME_DIR/functions.php"
+        # Création d'une copie temporaire sans le bloc de maintenance complet
+        awk '
+        /\/\/ Maintenance Mode Hook/,/}, 1);/ {next} 
+        {print}
+        ' "$THEME_DIR/functions.php" > "$THEME_DIR/functions.tmp"
+        
+        # Remplacement sécurisé
+        if [ $? -eq 0 ] && [ -s "$THEME_DIR/functions.tmp" ]; then
+            cp "$THEME_DIR/functions.tmp" "$THEME_DIR/functions.php"
+            rm -f "$THEME_DIR/functions.tmp"
+            chown www-data:www-data "$THEME_DIR/functions.php"
+            echo "→ Hook complètement retiré de functions.php"
+        else
+            echo "→ Attention: Erreur lors de la suppression du hook (fichier conservé)"
+            rm -f "$THEME_DIR/functions.tmp"
+        fi
     fi
     
+    # Rechargement du serveur
     /usr/local/lsws/bin/lswsctrl restart >/dev/null 2>&1
-    echo "→ Maintenance désactivée (serveur restarté)"
+    echo "✅ Maintenance DÉSACTIVÉE avec succès"
 }
 
 # Exécution principale
