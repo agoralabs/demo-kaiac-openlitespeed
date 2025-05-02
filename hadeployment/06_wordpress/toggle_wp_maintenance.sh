@@ -1,37 +1,49 @@
 #!/bin/bash
 
-
-MAINTENANCE_MODE="$1" # ex. on|off
-WP_SITE_NAME="$2" # ex. site1_skyscaledev_com
-
+# Vérification des arguments
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 [on|off] [site_name]"
+    echo "Exemple: $0 on site1_skyscaledev_com"
     exit 1
 fi
 
-# Configuration
-WEB_ROOT="/var/www/$WP_SITE_NAME"  # Chemin vers la racine WordPress
-ACTIVE_THEME_NAME=$(wp option get stylesheet --path="$WEB_ROOT" --allow-root) # Thème actif
-echo "ACTIVE_THEME_NAME=$ACTIVE_THEME_NAME"
+MAINTENANCE_MODE="$1"
+WP_SITE_NAME="$2"
+WEB_ROOT="/var/www/$WP_SITE_NAME"
 
-THEME_DIR="$WEB_ROOT/wp-content/themes/$ACTIVE_THEME_NAME"
-echo "THEME_DIR=$THEME_DIR"
+# Vérification de l'installation WordPress
+if [ ! -f "$WEB_ROOT/wp-config.php" ]; then
+    echo "Erreur : wp-config.php introuvable dans $WEB_ROOT"
+    exit 1
+fi
 
+# Récupération du thème actif (avec fallback SQL si WP-CLI échoue)
+get_active_theme() {
+    # Méthode WP-CLI
+    if [ -x "$(command -v wp)" ]; then
+        THEME_NAME=$(wp option get stylesheet --path="$WEB_ROOT" --allow-root 2>/dev/null)
+    fi
+    
+    # Fallback: méthode SQL directe
+    if [ -z "$THEME_NAME" ]; then
+        DB_NAME=$(grep -oP "DB_NAME',\s*'\K[^']+" "$WEB_ROOT/wp-config.php")
+        DB_USER=$(grep -oP "DB_USER',\s*'\K[^']+" "$WEB_ROOT/wp-config.php")
+        DB_PASS=$(grep -oP "DB_PASSWORD',\s*'\K[^']+" "$WEB_ROOT/wp-config.php")
+        THEME_NAME=$(mysql -N -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT option_value FROM wp_options WHERE option_name = 'stylesheet' LIMIT 1;" 2>/dev/null)
+    fi
+
+    if [ -z "$THEME_NAME" ]; then
+        echo "Erreur : Impossible de détecter le thème actif"
+        exit 1
+    fi
+    echo "$WEB_ROOT/wp-content/themes/$THEME_NAME"
+}
+
+THEME_DIR=$(get_active_theme)
 MAINTENANCE_HTML="$THEME_DIR/maintenance-page.php"
-echo "MAINTENANCE_HTML=$MAINTENANCE_HTML"
+LSCACHE_EXCLUSION="/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/maintenance-exclude.conf"
 
-LSCACHE_EXCLUSION="/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/maintenance-exclude.conf"  # Chemin de configuration OpenLiteSpeed
-exit 1
-# Préparation du folder de config du vhost
-mkdir -p "/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/"
-
-# Vérification des dépendances
-if [ ! -f "/usr/local/lsws/bin/lswsctrl" ]; then
-    echo "Erreur : OpenLiteSpeed n'est pas installé ou le chemin est incorrect."
-    exit 1
-fi
-
-# Fonction pour créer la page de maintenance
+# Fonctions
 create_maintenance_page() {
     cat << 'EOF' > "$MAINTENANCE_HTML"
 <!DOCTYPE html>
@@ -49,20 +61,22 @@ create_maintenance_page() {
 </body>
 </html>
 EOF
-    echo "→ Page de maintenance créée dans : ${MAINTENANCE_HTML}"
+    echo "→ Page de maintenance créée : $MAINTENANCE_HTML"
 }
 
-# Fonction pour ajouter le hook WordPress
 add_wp_hook() {
-    HOOK_FILE="${THEME_DIR}/functions.php"
-    if grep -q "custom_maintenance_mode" "$HOOK_FILE"; then
-        echo "→ Le hook est déjà présent dans functions.php."
-    else
+    HOOK_FILE="$THEME_DIR/functions.php"
+    if [ ! -f "$HOOK_FILE" ]; then
+        echo "Erreur : $HOOK_FILE introuvable"
+        exit 1
+    fi
+
+    if ! grep -q "custom_maintenance_mode" "$HOOK_FILE"; then
         cat << 'EOF' >> "$HOOK_FILE"
 
-// Activation manuelle du mode maintenance (script shell)
+// Mode maintenance activé par script
 function custom_maintenance_mode() {
-    if (!current_user_can('administrator') {
+    if (!current_user_can('administrator')) {
         header('HTTP/1.1 503 Service Temporarily Unavailable');
         header('Retry-After: 3600');
         include(get_template_directory() . '/maintenance-page.php');
@@ -71,35 +85,43 @@ function custom_maintenance_mode() {
 }
 add_action('template_redirect', 'custom_maintenance_mode', 1);
 EOF
-        echo "→ Hook ajouté à ${HOOK_FILE}"
+        echo "→ Hook ajouté à $HOOK_FILE"
     fi
 }
 
-# Fonction pour configurer l'exclusion LSCache
-configure_lscache_exclusion() {
+configure_lscache() {
+    mkdir -p "/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/"
     cat << 'EOF' > "$LSCACHE_EXCLUSION"
 RewriteCond %{DOCUMENT_ROOT}/wp-content/themes/*/maintenance-page.php -f
 RewriteRule .* - [E=Cache-Control:no-cache]
 EOF
-    # Recharge la configuration OpenLiteSpeed
     /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1
-    echo "→ Exclusion LSCache configurée. Cache relancé."
+    echo "→ Configuration LSCache mise à jour"
 }
 
-# Fonction pour activer/désactiver
+disable_maintenance() {
+    [ -f "$MAINTENANCE_HTML" ] && rm -f "$MAINTENANCE_HTML"
+    [ -f "$LSCACHE_EXCLUSION" ] && rm -f "$LSCACHE_EXCLUSION"
+    
+    if [ -f "$THEME_DIR/functions.php" ]; then
+        sed -i '/custom_maintenance_mode/,/add_action/d' "$THEME_DIR/functions.php"
+    fi
+    
+    /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1
+    echo "→ Maintenance désactivée"
+}
+
+# Exécution
 case "$MAINTENANCE_MODE" in
     on)
         create_maintenance_page
         add_wp_hook
-        configure_lscache_exclusion
-        echo "✅ Mode maintenance ACTIVÉ. Testez depuis une navigation privée."
+        configure_lscache
+        echo "✅ Maintenance ACTIVÉE pour $WP_SITE_NAME"
         ;;
     off)
-        rm -f "$MAINTENANCE_HTML"
-        sed -i '/custom_maintenance_mode/,/add_action/d' "${THEME_DIR}/functions.php"
-        rm -f "$LSCACHE_EXCLUSION"
-        /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1
-        echo "✅ Mode maintenance DÉSACTIVÉ."
+        disable_maintenance
+        echo "✅ Maintenance DÉSACTIVÉE pour $WP_SITE_NAME"
         ;;
     *)
         echo "Usage: $0 [on|off] [site_name]"
