@@ -1,6 +1,9 @@
 #!/bin/bash
 # Installe LiteSpeed Cache + active le cache
 
+# Prérequis sudo apt-get install php-mysql
+
+
 # Vérifier les paramètres
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <web_root>"
