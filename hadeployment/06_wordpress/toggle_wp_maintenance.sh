@@ -4,12 +4,22 @@
 MAINTENANCE_MODE="$1" # ex. on|off
 WP_SITE_NAME="$2" # ex. site1_skyscaledev_com
 
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 [on|off] [site_name]"
+    exit 1
+fi
+
 # Configuration
 WEB_ROOT="/var/www/$WP_SITE_NAME"  # Chemin vers la racine WordPress
 ACTIVE_THEME_NAME=$(wp option get stylesheet --path=${WEB_ROOT} --allow-root) # Thème actif
-wp option get stylesheet --path=${WEB_ROOT} --allow-root
-THEME_DIR="$WEB_ROOT/wp-content/themes/$ACTIVE_THEME_NAME" 
-MAINTENANCE_HTML="THEME_DIR/maintenance-page.php"
+echo "ACTIVE_THEME_NAME=$ACTIVE_THEME_NAME"
+
+THEME_DIR="$WEB_ROOT/wp-content/themes/$ACTIVE_THEME_NAME"
+echo "THEME_DIR=$THEME_DIR"
+
+MAINTENANCE_HTML="$THEME_DIR/maintenance-page.php"
+echo "MAINTENANCE_HTML=$MAINTENANCE_HTML"
+
 LSCACHE_EXCLUSION="/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/maintenance-exclude.conf"  # Chemin de configuration OpenLiteSpeed
 
 # Préparation du folder de config du vhost
@@ -77,32 +87,22 @@ EOF
 }
 
 # Fonction pour activer/désactiver
-toggle_maintenance() {
-    case "$MAINTENANCE_MODE" in
-        on)
-            create_maintenance_page
-            add_wp_hook
-            configure_lscache_exclusion
-            echo "✅ Mode maintenance ACTIVÉ. Testez depuis une navigation privée."
-            ;;
-        off)
-            rm -f "$MAINTENANCE_HTML"
-            sed -i '/custom_maintenance_mode/,/add_action/d' "${THEME_DIR}/functions.php"
-            rm -f "$LSCACHE_EXCLUSION"
-            /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1
-            echo "✅ Mode maintenance DÉSACTIVÉ."
-            ;;
-        *)
-            echo "Usage: $0 [on|off] [site_name]"
-            exit 1
-            ;;
-    esac
-}
-
-# Menu principal
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 [on|off] [site_name]"
-    exit 1
-else
-    toggle_maintenance
-fi
+case "$MAINTENANCE_MODE" in
+    on)
+        create_maintenance_page
+        add_wp_hook
+        configure_lscache_exclusion
+        echo "✅ Mode maintenance ACTIVÉ. Testez depuis une navigation privée."
+        ;;
+    off)
+        rm -f "$MAINTENANCE_HTML"
+        sed -i '/custom_maintenance_mode/,/add_action/d' "${THEME_DIR}/functions.php"
+        rm -f "$LSCACHE_EXCLUSION"
+        /usr/local/lsws/bin/lswsctrl reload >/dev/null 2>&1
+        echo "✅ Mode maintenance DÉSACTIVÉ."
+        ;;
+    *)
+        echo "Usage: $0 [on|off] [site_name]"
+        exit 1
+        ;;
+esac
