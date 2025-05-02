@@ -11,7 +11,7 @@ fi
 
 # Configuration
 WEB_ROOT="/var/www/$WP_SITE_NAME"  # Chemin vers la racine WordPress
-ACTIVE_THEME_NAME=$(wp option get stylesheet --path=${WEB_ROOT} --allow-root) # Thème actif
+ACTIVE_THEME_NAME=$(wp option get stylesheet --path="$WEB_ROOT" --allow-root) # Thème actif
 echo "ACTIVE_THEME_NAME=$ACTIVE_THEME_NAME"
 
 THEME_DIR="$WEB_ROOT/wp-content/themes/$ACTIVE_THEME_NAME"
@@ -21,7 +21,7 @@ MAINTENANCE_HTML="$THEME_DIR/maintenance-page.php"
 echo "MAINTENANCE_HTML=$MAINTENANCE_HTML"
 
 LSCACHE_EXCLUSION="/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/maintenance-exclude.conf"  # Chemin de configuration OpenLiteSpeed
-
+exit 1
 # Préparation du folder de config du vhost
 mkdir -p "/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/"
 
