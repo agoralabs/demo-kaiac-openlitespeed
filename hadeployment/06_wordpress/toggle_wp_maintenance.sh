@@ -11,35 +11,48 @@ MAINTENANCE_MODE="$1"
 WP_SITE_NAME="$2"
 WEB_ROOT="/var/www/$WP_SITE_NAME"
 
-# Vérification de l'installation WordPress
+# Vérifications initiales
+if [ ! -d "$WEB_ROOT" ]; then
+    echo "Erreur : Le dossier $WEB_ROOT n'existe pas"
+    exit 1
+fi
+
 if [ ! -f "$WEB_ROOT/wp-config.php" ]; then
     echo "Erreur : wp-config.php introuvable dans $WEB_ROOT"
     exit 1
 fi
 
-# Récupération du thème actif (avec fallback SQL si WP-CLI échoue)
+# Fonction pour détecter le thème actif
 get_active_theme() {
-    # Méthode WP-CLI
-    if [ -x "$(command -v wp)" ]; then
+    # Essayer d'abord avec WP-CLI
+    if command -v wp &> /dev/null; then
         THEME_NAME=$(wp option get stylesheet --path="$WEB_ROOT" --allow-root 2>/dev/null)
-    fi
-    
-    # Fallback: méthode SQL directe
-    if [ -z "$THEME_NAME" ]; then
-        DB_NAME=$(grep -oP "DB_NAME',\s*'\K[^']+" "$WEB_ROOT/wp-config.php")
-        DB_USER=$(grep -oP "DB_USER',\s*'\K[^']+" "$WEB_ROOT/wp-config.php")
-        DB_PASS=$(grep -oP "DB_PASSWORD',\s*'\K[^']+" "$WEB_ROOT/wp-config.php")
-        THEME_NAME=$(mysql -N -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT option_value FROM wp_options WHERE option_name = 'stylesheet' LIMIT 1;" 2>/dev/null)
+        [ -n "$THEME_NAME" ] && echo "$WEB_ROOT/wp-content/themes/$THEME_NAME" && return
     fi
 
-    if [ -z "$THEME_NAME" ]; then
-        echo "Erreur : Impossible de détecter le thème actif"
-        exit 1
-    fi
-    echo "$WEB_ROOT/wp-content/themes/$THEME_NAME"
+    # Fallback: lecture directe de la base de données
+    DB_NAME=$(grep -oP "DB_NAME',\s*'\K[^']+" "$WEB_ROOT/wp-config.php" | head -1)
+    DB_USER=$(grep -oP "DB_USER',\s*'\K[^']+" "$WEB_ROOT/wp-config.php" | head -1)
+    DB_PASS=$(grep -oP "DB_PASSWORD',\s*'\K[^']+" "$WEB_ROOT/wp-config.php" | head -1)
+    DB_PREFIX=$(grep -oP "\$table_prefix\s*=\s*'\K[^']+" "$WEB_ROOT/wp-config.php" | head -1)
+
+    THEME_NAME=$(mysql -N -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT option_value FROM ${DB_PREFIX}options WHERE option_name = 'stylesheet' LIMIT 1;" 2>/dev/null)
+    [ -n "$THEME_NAME" ] && echo "$WEB_ROOT/wp-content/themes/$THEME_NAME" && return
+
+    echo "ERROR" && return 1
 }
 
+# Détection du thème
 THEME_DIR=$(get_active_theme)
+if [ "$THEME_DIR" = "ERROR" ] || [ ! -d "$THEME_DIR" ]; then
+    echo "ERREUR CRITIQUE: Impossible de déterminer le thème actif ou le dossier n'existe pas"
+    echo "Thème détecté: $THEME_DIR"
+    echo "Veuillez vérifier:"
+    echo "1. Que WP-CLI est installé ou que vous avez accès à MySQL"
+    echo "2. Que le thème est bien installé dans wp-content/themes/"
+    exit 1
+fi
+
 MAINTENANCE_HTML="$THEME_DIR/maintenance-page.php"
 LSCACHE_EXCLUSION="/usr/local/lsws/conf/vhosts/$WP_SITE_NAME.d/maintenance-exclude.conf"
 
@@ -67,13 +80,13 @@ EOF
 add_wp_hook() {
     HOOK_FILE="$THEME_DIR/functions.php"
     if [ ! -f "$HOOK_FILE" ]; then
-        echo "Erreur : $HOOK_FILE introuvable"
-        exit 1
+        touch "$HOOK_FILE"
+        chown www-data:www-data "$HOOK_FILE"
     fi
 
     if ! grep -q "custom_maintenance_mode" "$HOOK_FILE"; then
         cat << 'EOF' >> "$HOOK_FILE"
-
+<?php
 // Mode maintenance activé par script
 function custom_maintenance_mode() {
     if (!current_user_can('administrator')) {
@@ -111,17 +124,20 @@ disable_maintenance() {
     echo "→ Maintenance désactivée"
 }
 
-# Exécution
+# Exécution principale
 case "$MAINTENANCE_MODE" in
     on)
+        echo "Activation du mode maintenance pour $WP_SITE_NAME"
+        echo "Thème détecté: $THEME_DIR"
         create_maintenance_page
         add_wp_hook
         configure_lscache
-        echo "✅ Maintenance ACTIVÉE pour $WP_SITE_NAME"
+        echo "✅ Maintenance ACTIVÉE avec succès"
         ;;
     off)
+        echo "Désactivation du mode maintenance pour $WP_SITE_NAME"
         disable_maintenance
-        echo "✅ Maintenance DÉSACTIVÉE pour $WP_SITE_NAME"
+        echo "✅ Maintenance DÉSACTIVÉE avec succès"
         ;;
     *)
         echo "Usage: $0 [on|off] [site_name]"
