@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 27 ]; then
+if [ "$#" -ne 29 ]; then
     echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
@@ -36,6 +36,8 @@ WP_SOURCE_DB_NAME="${24}" # provient du message SQS
 WP_PUSH_LOCATION="${25}" # provient du message SQS
 WP_SFTP_USER="${26}" # provient du message SQS
 WP_SFTP_PWD="${27}" # provient du message SQS
+WP_MAINTENANCE_MODE="${28}" # provient du message SQS
+WP_LSCACHE="${29}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -53,6 +55,21 @@ CONFIG_DB_SELECTION=""
 CONFIG_SELECTED_TABLES=""
 CONFIG_PERFORM_SEARCH_REPLACE=""
 WP_SFTP_ADD_USER_SCRIPT="/home/ubuntu/add_sftp_user.sh"
+WP_TOGGLE_MAINTENANCE_SCRIPT="/home/ubuntu/toggle_wp_maintenance.sh"
+WP_TOGGLE_LSCACHE_SCRIPT="/home/ubuntu/toggle_wp_lscache.sh"
+
+# Fonction pour vérifier si l'installation nécessite une configuration complète
+needs_full_config() {
+    local method=$1
+    case "$method" in
+        "push"|"maintenance"|"cache")
+            return 1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
 
 # Fonction pour générer des clés aléatoires sécurisées
 generate_wordpress_key() {
@@ -466,7 +483,7 @@ push_wordpress_site() {
 }
 
 # Configurer la base de données
-if [ "$INSTALLATION_METHOD" != "push" ]; then
+if needs_full_config "$INSTALLATION_METHOD"; then
 echo "Configuration de la base de données MySQL..."
     mysql -h "${MYSQL_DB_HOST}" -u "${MYSQL_ROOT_USER}" -p"${MYSQL_ROOT_PASSWORD}" <<MYSQL_SCRIPT
 CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -503,15 +520,21 @@ case "$INSTALLATION_METHOD" in
                           "$WP_SOURCE_DB_NAME" "$WP_DB_NAME" \
                           "$MYSQL_DB_HOST" "$WP_SOURCE_DOMAIN" "$DOMAIN"
         ;;
+    "maintenance")
+        $WP_TOGGLE_MAINTENANCE_SCRIPT "$WP_MAINTENANCE_MODE" "$DOMAIN_FOLDER"
+        ;;
+    "cache")
+        $WP_TOGGLE_LSCACHE_SCRIPT "$WP_LSCACHE" "$DOMAIN_FOLDER"
+        ;;
     *)
         echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
-        echo "Utilisez 'standard', 'git', 'zip_and_sql', 'copy' ou 'push'"
+        echo "Utilisez 'standard', 'git', 'zip_and_sql', 'copy', 'push', 'maintenance' ou 'cache'"
         exit 1
         ;;
 esac
 
 
-if [ "$INSTALLATION_METHOD" != "push" ]; then
+if needs_full_config "$INSTALLATION_METHOD"; then
 # Générer les clés de sécurité
 echo "Génération des clés de sécurité..."
 AUTH_KEY=$(generate_wordpress_key)
@@ -706,7 +729,7 @@ fi
 
 
 # Créer un utilisateur SFTP
-if [ "$INSTALLATION_METHOD" != "push" ]; then
+if needs_full_config "$INSTALLATION_METHOD"; then
 
     if [ -f "$WP_SFTP_ADD_USER_SCRIPT" ]; then
         $WP_SFTP_ADD_USER_SCRIPT "$DOMAIN_FOLDER" "$WP_SFTP_USER" "$WP_SFTP_PWD"
@@ -721,3 +744,4 @@ echo "Methode: ${INSTALLATION_METHOD}"
 echo "Répertoire WordPress: ${WEB_ROOT}"
 echo "Base de données: ${WP_DB_NAME}"
 echo "======================================"
+

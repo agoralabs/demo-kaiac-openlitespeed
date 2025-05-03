@@ -76,7 +76,9 @@ async function createWordPress(instanceId, message) {
     `"${message.wp_source_db_name}"`,
     `"${message.wp_push_location}"`,
     `"${message.ftp_user}"`,
-    `"${message.ftp_pwd}"`
+    `"${message.ftp_pwd}"`,
+    `"${message.maintenance_mode}"`,
+    `"${message.lscache}"`
   ].join(' ');
 
   console.log('Exécution de la commande SSM:', command);
