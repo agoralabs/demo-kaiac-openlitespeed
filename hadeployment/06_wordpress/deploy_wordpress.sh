@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 29 ]; then
+if [ "$#" -ne 31 ]; then
     echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
@@ -38,6 +38,8 @@ WP_SFTP_USER="${26}" # provient du message SQS
 WP_SFTP_PWD="${27}" # provient du message SQS
 WP_MAINTENANCE_MODE="${28}" # provient du message SQS
 WP_LSCACHE="${29}" # provient du message SQS
+WP_BACKUP_TYPE="${30}" # provient du message SQS
+WP_BACKUP_S3_LOCATION="${31}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -62,7 +64,7 @@ WP_TOGGLE_LSCACHE_SCRIPT="/home/ubuntu/toggle_wp_lscache.sh"
 needs_full_config() {
     local method=$1
     case "$method" in
-        "push"|"maintenance"|"cache")
+        "push"|"maintenance"|"cache"|"backup")
             return 1
             ;;
         *)
@@ -211,6 +213,73 @@ copy_selected_tables() {
     fi
     
     echo "Copie des tables terminée."
+}
+
+# Fonction pour créer un zip contenant le zip du repertoire wordpress et le dump sql de la base de données
+create_backup() {
+    local backup_type=$1 # 'full', 'database', 'files'
+    local wp_folder=$2
+    local db_name=$3
+    local db_host=$4
+    local backup_s3_location=$5
+    
+    echo "Création du backup..."
+
+    # Création du zip
+    # Sauvegarde dans S3
+    if [ "$backup_type" = "full" ]; then
+        echo "Création d'un backup complet contenant les fichiers wordpress et la base de données..."
+        # Zip wordpress
+        TEMP_BACKUP_FILE=$(mktemp)
+        zip -r "$TEMP_BACKUP_FILE" "$wp_folder"
+        TEMP_SQL_FILE=$(mktemp)
+        mysqldump -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$db_name" > "$TEMP_SQL_FILE"
+        # Zip contenant $TEMP_BACKUP_FILE et $TEMP_SQL_FILE
+        # Create a temporary directory for combining files
+        TEMP_COMBINED_DIR=$(mktemp -d)
+
+        # Copy files to combined directory
+        cp "$TEMP_BACKUP_FILE" "$TEMP_COMBINED_DIR/wordpress_files.zip"
+        cp "$TEMP_SQL_FILE" "$TEMP_COMBINED_DIR/database.sql"
+
+        # Create final zip containing both files
+        TEMP_FINAL_ZIP=$(mktemp)
+        cd "$TEMP_COMBINED_DIR"
+        zip -r "$TEMP_FINAL_ZIP" ./*
+        
+        # Clean up temporary files and directory
+        aws s3 cp "$TEMP_FINAL_ZIP" "$backup_s3_location"
+
+        rm -rf "$TEMP_BACKUP_FILE"
+        rm -rf "$TEMP_SQL_FILE"
+        rm -rf "$TEMP_COMBINED_DIR"
+        rm -rf "$TEMP_FINAL_ZIP"
+
+    elif [ "$backup_type" = "database" ]; then
+        echo "Création d'un backup de la base de données..."
+        TEMP_SQL_FILE=$(mktemp)
+        mysqldump -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$db_name" > "$TEMP_SQL_FILE"
+        TEMP_FINAL_ZIP=$(mktemp)
+        zip -j "$TEMP_FINAL_ZIP" "$TEMP_SQL_FILE"        
+        aws s3 cp "$TEMP_FINAL_ZIP" "$backup_s3_location"
+
+        rm -rf "$TEMP_SQL_FILE"
+        rm -rf "$TEMP_FINAL_ZIP"
+    elif [ "$backup_type" = "files" ]; then
+        echo "Création d'un backup des fichiers..."
+        TEMP_BACKUP_FILE=$(mktemp)
+        zip -r "$TEMP_BACKUP_FILE" "$wp_folder"
+
+        aws s3 cp "$TEMP_BACKUP_FILE" "$backup_s3_location"
+
+        rm -rf "$TEMP_BACKUP_FILE"
+    else
+        echo "Type de backup inconnu: $backup_type"
+        exit 1
+    fi
+
+
+    echo "Backup créé avec succès."
 }
 
 # Afficher la configuration
@@ -525,6 +594,9 @@ case "$INSTALLATION_METHOD" in
         ;;
     "cache")
         $WP_TOGGLE_LSCACHE_SCRIPT "$WP_LSCACHE" "$DOMAIN_FOLDER"
+        ;;
+    "backup")
+        create_backup "$WP_BACKUP_TYPE" "$WEB_ROOT" "$WP_DB_NAME" "$MYSQL_DB_HOST" "$WP_BACKUP_S3_LOCATION"
         ;;
     *)
         echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
