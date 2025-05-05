@@ -9,12 +9,11 @@ fi
 
 WP_BACKUP_TYPE="$1"
 WP_BACKUP_S3_LOCATION="$2"
-DOMAIN_FOLDER="$3"
+WEB_ROOT="$3"
 WP_DB_NAME="$4"
 MYSQL_DB_HOST="$5"
 MYSQL_ROOT_USER="$6"
 MYSQL_ROOT_PASSWORD="$7"
-WEB_ROOT="/var/www/$DOMAIN_FOLDER"
 
 create_backup() {
     local backup_type=$1
