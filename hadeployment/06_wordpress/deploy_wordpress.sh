@@ -325,6 +325,57 @@ install_wordpress_git() {
     fi
 }
 
+# Fonction pour installer WordPress à partir de fichiers Backup zip
+install_wordpress_from_backup() {
+    local folder=$1
+    local backup_type=$2
+    local backup_location=$3
+    local db_host=$4
+    local db_user=$5
+    local db_password=$6
+    local db_name=$7
+    local wp_source_domain=$8
+    local wp_new_domain=$9
+
+
+    echo "Installation de WordPress à partir des fichiers..."
+    
+    # Créer un dossier temporaire
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR" || exit 1
+
+    # Télécharger l'archive WordPress depuis S3
+    echo "Téléchargement de l'archive depuis ${backup_location}..."
+    aws s3 cp "$backup_location" final_backup.zip
+
+    # Extraire l'archive finale
+    echo "Extraction de l'archive..."
+    unzip -q final_backup.zip -d "$TEMP_DIR"
+
+    if [ $? -ne 0 ]; then
+        echo "Échec du téléchargement de l'archive WordPress"
+        exit 1
+    fi
+
+    if [ "$backup_type" = "full" ] || [ "$backup_type" = "files" ] ; then
+        # Extraire les fichiers wordpress
+        unzip -q "$TEMP_DIR/wordpress_files.zip" -d "$folder"
+    fi
+
+    if [ "$backup_type" = "full" ] || [ "$backup_type" = "database" ] ; then
+
+        perform_search_replace "$wp_source_domain" "$wp_new_domain" "$TEMP_DIR/database.sql"
+
+        # Importer la base de données
+        echo "Importation de la base de données..."
+        mysql -h "$db_host" -u "$db_user" -p"$db_password" "$db_name" < $TEMP_DIR/database.sql
+    fi
+
+    rm -rf $TEMP_DIR
+
+    echo "WordPress déployé avec succès à partir du backup ${backup_location}"
+}
+
 # Fonction pour installer WordPress à partir de fichiers (ZIP + SQL)
 install_wordpress_from_files() {
     local folder=$1
@@ -532,12 +583,18 @@ case "$INSTALLATION_METHOD" in
     "backup")
         $WP_BACKUP_SCRIPT "$WP_BACKUP_TYPE" "$WP_BACKUP_S3_LOCATION" "$WEB_ROOT" "$WP_DB_NAME" "$MYSQL_DB_HOST" "$MYSQL_ROOT_USER" "$MYSQL_ROOT_PASSWORD"
         ;;
+    "restore")
+        install_wordpress_from_backup "$WEB_ROOT" "$WP_BACKUP_TYPE" "$WP_BACKUP_S3_LOCATION" \
+                    "$MYSQL_DB_HOST" "$MYSQL_ROOT_USER" "$MYSQL_ROOT_PASSWORD" "$WP_DB_NAME" \
+                    "$WP_SOURCE_DOMAIN" "$DOMAIN"
+        ;;
     *)
         echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
-        echo "Utilisez 'standard', 'git', 'zip_and_sql', 'copy', 'push', 'maintenance' ou 'cache'"
+        echo "Utilisez 'standard', 'git', 'zip_and_sql', 'copy', 'push', 'maintenance', 'cache', 'backup' ou 'restore' "
         exit 1
         ;;
 esac
+
 
 
 if needs_full_config "$INSTALLATION_METHOD"; then
