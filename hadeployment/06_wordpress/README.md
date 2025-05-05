@@ -89,6 +89,7 @@ curl -o toggle_wp_lscache.sh https://raw.githubusercontent.com/agoralabs/demo-ka
 
 curl -o toggle_wp_maintenance.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/toggle_wp_maintenance.sh
 
+curl -o backup_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/backup_wordpress.sh
 
 # Résultat activation LS Cache
 
