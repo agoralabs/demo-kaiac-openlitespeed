@@ -35,7 +35,7 @@ create_backup() {
         
         # Sauvegarde des fichiers WordPress
         local WP_ZIP="$TEMP_DIR/wordpress_files.zip"
-        cd "$wp_folder/.." && zip -r "$WP_ZIP" "$(basename "$wp_folder")"
+        cd "$wp_folder/.." && zip -r "$WP_ZIP" "$(basename "$wp_folder")" -x "*.git/*"
         
         # Sauvegarde de la base de données
         local SQL_FILE="$TEMP_DIR/database.sql"
@@ -62,7 +62,7 @@ create_backup() {
         echo "Création d'un backup des fichiers..."
         
         local FINAL_ZIP="$TEMP_DIR/final_backup.zip"
-        cd "$wp_folder/.." && zip -r "$FINAL_ZIP" "$(basename "$wp_folder")"
+        cd "$wp_folder/.." && zip -r "$FINAL_ZIP" "$(basename "$wp_folder")" -x "*.git/*"
         aws s3 cp "$FINAL_ZIP" "$backup_s3_location"
         
     else
