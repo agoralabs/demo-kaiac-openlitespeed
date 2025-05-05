@@ -32,9 +32,12 @@ create_backup() {
     if [ "$backup_type" = "full" ]; then
         echo "Création d'un backup complet contenant les fichiers wordpress et la base de données..."
         
+        # Le zip de /var/www/site1_skyscaledev_com contient site1_skyscaledev_com je voudrais que le zip contiennent directement de contenu de site1_skyscaledev_com
         # Sauvegarde des fichiers WordPress
         local WP_ZIP="$TEMP_DIR/wordpress_files.zip"
-        cd "$wp_folder/.." && zip -r "$WP_ZIP" "$(basename "$wp_folder")" -x "*.git/*"
+        cd "$wp_folder" && zip -r "$WP_ZIP" . -x "*.git/*"
+        #local WP_ZIP="$TEMP_DIR/wordpress_files.zip"
+        #cd "$wp_folder/.." && zip -r "$WP_ZIP" "$(basename "$wp_folder")" -x "*.git/*"
         
         # Sauvegarde de la base de données
         local SQL_FILE="$TEMP_DIR/database.sql"
@@ -61,7 +64,8 @@ create_backup() {
         echo "Création d'un backup des fichiers..."
         
         local FINAL_ZIP="$TEMP_DIR/final_backup.zip"
-        cd "$wp_folder/.." && zip -r "$FINAL_ZIP" "$(basename "$wp_folder")" -x "*.git/*"
+        cd "$wp_folder" && zip -r "$FINAL_ZIP" . -x "*.git/*"
+        #cd "$wp_folder/.." && zip -r "$FINAL_ZIP" "$(basename "$wp_folder")" -x "*.git/*"
         aws s3 cp "$FINAL_ZIP" "$backup_s3_location"
         
     else
