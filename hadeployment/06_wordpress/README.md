@@ -91,6 +91,8 @@ curl -o toggle_wp_maintenance.sh https://raw.githubusercontent.com/agoralabs/dem
 
 curl -o backup_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/backup_wordpress.sh
 
+curl -o update_ols_rewrite_rules.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/update_ols_rewrite_rules.sh
+
 # Résultat activation LS Cache
 
 ```

@@ -60,12 +60,13 @@ WP_SFTP_ADD_USER_SCRIPT="/home/ubuntu/add_sftp_user.sh"
 WP_TOGGLE_MAINTENANCE_SCRIPT="/home/ubuntu/toggle_wp_maintenance.sh"
 WP_TOGGLE_LSCACHE_SCRIPT="/home/ubuntu/toggle_wp_lscache.sh"
 WP_BACKUP_SCRIPT="/home/ubuntu/backup_wordpress.sh"
+WP_REWRITE_RULES_SCRIPT="/home/ubuntu/update_ols_rewrite_rules.sh"
 
 # Fonction pour vérifier si l'installation nécessite une configuration complète
 needs_full_config() {
     local method=$1
     case "$method" in
-        "push"|"maintenance"|"cache"|"backup")
+        "push"|"maintenance"|"cache"|"backup"|"redirect")
             return 1
             ;;
         *)
@@ -588,12 +589,16 @@ case "$INSTALLATION_METHOD" in
                     "$MYSQL_DB_HOST" "$MYSQL_ROOT_USER" "$MYSQL_ROOT_PASSWORD" "$WP_DB_NAME" \
                     "$WP_SOURCE_DOMAIN" "$DOMAIN"
         ;;
+    "redirect")
+        $WP_REWRITE_RULES_SCRIPT "$DOMAIN_FOLDER"
+        ;;
     *)
         echo "Méthode d'installation non reconnue: $INSTALLATION_METHOD"
         echo "Utilisez 'standard', 'git', 'zip_and_sql', 'copy', 'push', 'maintenance', 'cache', 'backup' ou 'restore' "
         exit 1
         ;;
 esac
+
 
 
 
