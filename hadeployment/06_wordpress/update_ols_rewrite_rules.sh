@@ -21,53 +21,43 @@ if [ -z "$RULES_JSON" ]; then
   exit 1
 fi
 
-# 2. Écrire dans un fichier temporaire en excluant les blocs rewrite de premier niveau
-awk '
-  BEGIN {
-    depth = 0
-    in_rewrite = 0
-  }
-  {
-    line = $0
-    open = gsub(/{/, "", line)
-    close = gsub(/}/, "", line)
-    brace_delta = open - close
+# 2. Créer un fichier temporaire avec le nouveau contenu
+{
+  # Copier tout le contenu SAUF la section rewrite principale
+  # Utilisation d'une approche plus simple et compatible
+  in_rewrite=0
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^rewrite[[:space:]]+\{[[:space:]]*$ ]]; then
+      in_rewrite=1
+      continue
+    fi
+    
+    if [[ $in_rewrite -eq 1 ]]; then
+      if [[ "$line" =~ ^}[[:space:]]*$ ]]; then
+        in_rewrite=0
+      fi
+      continue
+    fi
+    
+    echo "$line"
+  done < "${VHOST_CONF_FILE}"
+  
+  # Ajouter la nouvelle section rewrite
+  echo "rewrite {"
+  echo "  enable 1"
+  echo "  autoLoadHtaccess 0"
+  echo "  rules <<<END_rules"
+  
+  # Ajouter les règles actives triées par priorité
+  echo "$RULES_JSON" | jq -r '.rules | sort_by(.priority)[] | select(.is_active == true) | 
+    (if .condition and (.condition != "") then "  \(.condition)\n" else "" end) + 
+    "  \(.rewrite_rule)"'
+  
+  echo "END_rules"
+  echo "}"
+} > "${TMP_FILE}"
 
-    # Début de bloc rewrite à la racine
-    if (!in_rewrite && depth == 0 && $1 == "rewrite" && $2 == "{") {
-      in_rewrite = 1
-      next
-    }
-
-    # Si dans un bloc rewrite, ne rien imprimer
-    if (in_rewrite) {
-      if (brace_delta < 0) {
-        in_rewrite = 0
-      }
-      depth += brace_delta
-      next
-    }
-
-    print $0
-    depth += brace_delta
-  }
-' "${VHOST_CONF_FILE}" > "${TMP_FILE}"
-
-# 3. Ajouter la nouvelle section rewrite à la fin du fichier temporaire
-cat <<EOF >> "${TMP_FILE}"
-
-rewrite {
-  enable 1
-  autoLoadHtaccess 0
-  rules <<<END_rules
-$(echo "$RULES_JSON" | jq -r '.rules | sort_by(.priority)[] | select(.is_active == true) | 
-  (if .condition and (.condition != "") then "  \(.condition)\n" else "" end) + 
-  "  \(.rewrite_rule)"')
-END_rules
-}
-EOF
-
-# 4. Remplacer le fichier original
+# 3. Remplacer le fichier original
 mv "${TMP_FILE}" "${VHOST_CONF_FILE}"
 
 echo "✅ Terminé ! Les règles ont été appliquées pour le vHost ${VHOST_NAME}."
