@@ -7,8 +7,7 @@ VHOST_NAME="$1"      # Nom du Virtual Host (ex: "site1_skyscaledev_com")
 PARAMETER_PATH="/wordpress/${VHOST_NAME}/redirects" # Chemin du paramètre dans Parameter Store
 OLS_CONF_DIR="/usr/local/lsws/conf/vhosts"
 VHOST_CONF_FILE="${OLS_CONF_DIR}/${VHOST_NAME}/vhconf.conf"
-
-TMP_RULES_FILE=$(mktemp)
+TMP_FILE=$(mktemp)
 
 AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
 
@@ -22,35 +21,27 @@ if [ -z "$RULES_JSON" ]; then
   exit 1
 fi
 
-# 2. Parser le JSON et générer les règles triées par priorité
-echo "🔨 Génération des règles de réécriture..."
-cat > "${TMP_RULES_FILE}" <<EOL
-rewrite {
-  enable 1
-  autoLoadHtaccess 0
-  rules <<<END_rules
-EOL
+# 2. Créer un fichier temporaire avec le nouveau contenu
+{
+  # Copier tout le contenu SAUF la section rewrite
+  sed '/rewrite {/,/}/d' "${VHOST_CONF_FILE}"
+  
+  # Ajouter la nouvelle section rewrite
+  echo "rewrite {"
+  echo "  enable 1"
+  echo "  autoLoadHtaccess 0"
+  echo "  rules <<<END_rules"
+  
+  # Ajouter les règles actives triées par priorité
+  echo "$RULES_JSON" | jq -r '.rules | sort_by(.priority)[] | select(.is_active == true) | 
+    (if .condition and (.condition != "") then "  \(.condition)\n" else "" end) + 
+    "  \(.rewrite_rule)"'
+  
+  echo "END_rules"
+  echo "}"
+} > "${TMP_FILE}"
 
-# Extraire les règles, les trier par priorité et les formater
-echo "$RULES_JSON" | jq -r '.rules | sort_by(.priority)[] | select(.is_active == true) | 
-  (if .condition and (.condition != "") then "  \(.condition)\n" else "" end) + 
-  "  \(.rewrite_rule)"' >> "${TMP_RULES_FILE}"
-
-cat >> "${TMP_RULES_FILE}" <<EOL
-END_rules
-}
-EOL
-
-# 3. Mettre à jour le fichier de configuration du VHost
-echo "📝 Mise à jour de ${VHOST_CONF_FILE}..."
-
-# Supprimer l'ancienne section rewrite si elle existe
-sed -i '/rewrite {/,/}/d' "${VHOST_CONF_FILE}"
-
-# Ajouter les nouvelles règles
-cat "${TMP_RULES_FILE}" >> "${VHOST_CONF_FILE}"
-
-# Nettoyage
-rm -rf "${TMP_RULES_FILE}"
+# 3. Remplacer le fichier original
+mv "${TMP_FILE}" "${VHOST_CONF_FILE}"
 
 echo "✅ Terminé ! Les règles ont été appliquées pour le vHost ${VHOST_NAME}."
