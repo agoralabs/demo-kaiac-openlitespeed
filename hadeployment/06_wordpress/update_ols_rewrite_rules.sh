@@ -21,50 +21,51 @@ if [ -z "$RULES_JSON" ]; then
   exit 1
 fi
 
-# 2. Créer un fichier temporaire avec le nouveau contenu (sans les blocs rewrite au niveau racine)
+# 2. Écrire dans un fichier temporaire en excluant les blocs rewrite de premier niveau
 awk '
-  function count_braces(line,   open, close) {
+  BEGIN {
+    depth = 0
+    in_rewrite = 0
+  }
+  {
+    line = $0
     open = gsub(/{/, "", line)
     close = gsub(/}/, "", line)
-    return open - close
-  }
+    brace_delta = open - close
 
-  {
-    depth += count_braces($0)
-
+    # Début de bloc rewrite à la racine
     if (!in_rewrite && depth == 0 && $1 == "rewrite" && $2 == "{") {
       in_rewrite = 1
-      rewrite_depth = depth
       next
     }
 
+    # Si dans un bloc rewrite, ne rien imprimer
     if (in_rewrite) {
-      depth += count_braces($0)
-      if (depth == rewrite_depth - 1) {
+      if (brace_delta < 0) {
         in_rewrite = 0
       }
+      depth += brace_delta
       next
     }
 
-    print
+    print $0
+    depth += brace_delta
   }
 ' "${VHOST_CONF_FILE}" > "${TMP_FILE}"
 
-# 3. Ajouter la nouvelle section rewrite à la fin
-{
-  echo ""
-  echo "rewrite {"
-  echo "  enable 1"
-  echo "  autoLoadHtaccess 0"
-  echo "  rules <<<END_rules"
+# 3. Ajouter la nouvelle section rewrite à la fin du fichier temporaire
+cat <<EOF >> "${TMP_FILE}"
 
-  echo "$RULES_JSON" | jq -r '.rules | sort_by(.priority)[] | select(.is_active == true) | 
-    (if .condition and (.condition != "") then "  \(.condition)\n" else "" end) + 
-    "  \(.rewrite_rule)"'
-
-  echo "END_rules"
-  echo "}"
-} >> "${TMP_FILE}"
+rewrite {
+  enable 1
+  autoLoadHtaccess 0
+  rules <<<END_rules
+$(echo "$RULES_JSON" | jq -r '.rules | sort_by(.priority)[] | select(.is_active == true) | 
+  (if .condition and (.condition != "") then "  \(.condition)\n" else "" end) + 
+  "  \(.rewrite_rule)"')
+END_rules
+}
+EOF
 
 # 4. Remplacer le fichier original
 mv "${TMP_FILE}" "${VHOST_CONF_FILE}"
