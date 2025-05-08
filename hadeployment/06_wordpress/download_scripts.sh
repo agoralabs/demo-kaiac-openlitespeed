@@ -30,9 +30,11 @@ scripts_ftp=(
 # Boucle pour télécharger chaque script
 for script in "${scripts_wp[@]}"; do
     curl -o "$script" "https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/$script"
+    chmod +x "$script"
 done
 
 for script in "${scripts_ftp[@]}"; do
     curl -o "$script" "https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/05_ftp/sftp-autoscaling/$script"
+    chmod +x "$script"
 done
 
