@@ -16,6 +16,7 @@ scripts_wp=(
     "toggle_wp_lscache.sh"
     "toggle_wp_maintenance.sh"
     "update_ols_rewrite_rules.sh"
+    "delete_parameters_store.sh"
     )
 
 scripts_ftp=(

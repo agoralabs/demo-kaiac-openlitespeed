@@ -66,6 +66,7 @@ WP_CONFIGURE_WP_CONFIG="/home/ubuntu/configure_wp_config.sh"
 WP_CONFIGURE_OPENLITESPEED="/home/ubuntu/configure_openlitespeed.sh"
 WP_CREATE_DNS_RECORD="/home/ubuntu/create_dns_record.sh"
 WP_CREATE_MYSQL_DATABASE="/home/ubuntu/create_mysql_database.sh"
+WP_DELETE_PARAMETER_STORE="/home/ubuntu/delete_parameters_store.sh"
 
 # Fonction pour vérifier si l'installation nécessite une configuration complète
 needs_full_config() {
@@ -622,6 +623,7 @@ case "$INSTALLATION_METHOD" in
         $WP_DELETE_SCRIPT "$DOMAIN" "$DOMAIN_FOLDER" "$MYSQL_DB_HOST" "$WP_DB_NAME" \
                     "$MYSQL_ROOT_USER" "$MYSQL_ROOT_PASSWORD" "$RECORD_NAME" "$TOP_DOMAIN" \
                     "$WP_SFTP_USER"
+        $WP_DELETE_PARAMETER_STORE "$DOMAIN_FOLDER"
         ;;
     *)
         echo "Traitement non reconnu: $INSTALLATION_METHOD"
