@@ -83,16 +83,6 @@ needs_full_config() {
     esac
 }
 
-# Fonction pour générer des clés aléatoires sécurisées
-generate_wordpress_key() {
-    local chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?'
-    local key=''
-    for i in {1..64}; do
-        key+="${chars:RANDOM%${#chars}:1}"
-    done
-    echo "$key"
-}
-
 # Fonction pour vérifier les commandes nécessaires
 check_requirements() {
     local commands=("wget" "mysql" "systemctl" "aws" "unzip")

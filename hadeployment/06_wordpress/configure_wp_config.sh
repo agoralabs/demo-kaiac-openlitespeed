@@ -14,6 +14,16 @@ WP_DB_USER="$4"
 WP_DB_PASSWORD="$5"
 MYSQL_DB_HOST="$6"
 
+# Fonction pour générer des clés aléatoires sécurisées
+generate_wordpress_key() {
+    local chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?'
+    local key=''
+    for i in {1..64}; do
+        key+="${chars:RANDOM%${#chars}:1}"
+    done
+    echo "$key"
+}
+
 # Générer les clés de sécurité
 echo "Génération des clés de sécurité..."
 AUTH_KEY=$(generate_wordpress_key)
@@ -47,16 +57,8 @@ define('NONCE_SALT',       '${NONCE_SALT}');
 
 \$table_prefix = 'wp_';
 define('WP_DEBUG', false);  // true Active le mode débogage
-define('WP_DEBUG_LOG', false); // true écrit dans /wp-content/debug.log
+define('WP_DEBUG_LOG', '/usr/local/lsws/logs/vhosts/${DOMAIN_FOLDER}/wp-debug.log'); // par défaut écrit dans /wp-content/debug.log
 define('WP_DEBUG_DISPLAY', false); // false désactive l'affichage à l'écran
-
-// Modifier l'emplacement du fichier debug.log
-add_filter(
-    'wp_debug_log_location',
-    function() {
-        return '/usr/local/lsws/logs/vhosts/${DOMAIN_FOLDER}/wp-debug.log';
-    }
-);
 
 if ( ! defined( 'ABSPATH' ) ) {
   define( 'ABSPATH', __DIR__ . '/' );
