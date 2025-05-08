@@ -75,23 +75,10 @@ Exécutez ces étapes, et WordPress devrait détecter correctement MySQL/MariaDB
 
 # Téléchargement des scripts sh
 
-curl -o deploy_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/deploy_wordpress.sh
+curl -o download_scripts.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/download_scripts.sh
 
-
-curl -o delete_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/delete_wordpress.sh
-
-
-curl -o install_wp_cli.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/install_wp_cli.sh
-
-
-curl -o toggle_wp_lscache.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/toggle_wp_lscache.sh
-
-
-curl -o toggle_wp_maintenance.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/toggle_wp_maintenance.sh
-
-curl -o backup_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/backup_wordpress.sh
-
-curl -o update_ols_rewrite_rules.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/hadeployment/06_wordpress/update_ols_rewrite_rules.sh
+chmod +x download_scripts.sh
+./download_scripts.sh
 
 # Résultat activation LS Cache
 
@@ -123,3 +110,12 @@ x-litespeed-cache-control: public,max-age=604800
 x-litespeed-tag: 00f_home,00f_URL.6666cd76f96956469e7be39d750cc7d9,00f_F,00f_
 server: LiteSpeed
 ```
+
+
+# Vérifier les prérequis
+check_requirements
+
+# Installer les dépendances
+echo "Installation des dépendances..."
+sudo apt-get update > /dev/null
+sudo apt-get install -y python3-pymysql > /dev/null

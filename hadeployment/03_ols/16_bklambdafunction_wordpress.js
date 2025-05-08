@@ -47,9 +47,9 @@ async function waitForCommandCompletion(instanceId, commandId) {
 }
 
 // Fonction principale pour créer un site WordPress
-async function createWordPress(instanceId, message) {
+async function manageWordPress(instanceId, message) {
   const command = [
-    process.env.SCRIPT_COMMAND || '/home/ubuntu/deploy_wordpress.sh',
+    process.env.SCRIPT_COMMAND || '/home/ubuntu/manage_wordpress.sh',
     `"${message.record}.${message.domain}"`,
     `"${message.domain_folder}"`,
     `"${message.wp_db_name  || ''}"`,
@@ -101,34 +101,6 @@ async function createWordPress(instanceId, message) {
   };
 }
 
-// Fonction pour supprimer un site WordPress
-async function deleteWordPress(instanceId, message) {
-  const command = [
-    process.env.DELETE_SCRIPT_COMMAND || '/home/ubuntu/delete_wordpress.sh',
-    `"${message.record}.${message.domain}"`,
-    `"${message.domain_folder}"`,
-    `"${process.env.MYSQL_DB_HOST || 'localhost'}"`,
-    `"${message.wp_db_name  || ''}"`,
-    `"${process.env.MYSQL_ROOT_USER || 'root'}"`,
-    `"${process.env.MYSQL_ROOT_PASSWORD}"`,
-    `"${message.record  || ''}"`,
-    `"${message.domain  || ''}"`,
-    `"${message.ftp_user  || ''}"`
-  ].join(' ');
-
-  console.log('Exécution de la commande de suppression:', command);
-  
-  const { Command } = await clients.ssm.sendCommand({
-    InstanceIds: [instanceId],
-    DocumentName: 'AWS-RunShellScript',
-    Parameters: { commands: [command] },
-    TimeoutSeconds: 300
-  }).promise();
-
-  // Attendre la fin de l'exécution
-  await waitForCommandCompletion(instanceId, Command.CommandId);
-}
-
 exports.handler = async (event) => {
   console.log('Événement reçu:', JSON.stringify(event, null, 2));
 
@@ -144,9 +116,6 @@ exports.handler = async (event) => {
         const message = JSON.parse(record.body);
         console.log('Traitement du message:', message);
 
-        if (!['CREATE_WP', 'DELETE_WP'].includes(message.command)) {
-          throw new Error(`Commande invalide: ${message.command}`);
-        }
         console.log(`Trouver l'instance EC2`);
         // Trouver l'instance EC2
         const { Reservations } = await clients.ec2.describeInstances({
@@ -163,13 +132,7 @@ exports.handler = async (event) => {
 
         console.log(`Exécuter la commande appropriée ${message.command}`);
         // Exécuter la commande appropriée
-        if (message.command === 'CREATE_WP') {
-          await createWordPress(instanceId, message);
-          console.log(`Site WordPress créé pour ${message.record}.${message.domain}`);
-        } else {
-          await deleteWordPress(instanceId, message);
-          console.log(`Site WordPress supprimé pour ${message.record}.${message.domain}`);
-        }
+        await manageWordPress(instanceId, message);
 
         console.log(`Commande appropriée ${message.command} exécutée`);
 
