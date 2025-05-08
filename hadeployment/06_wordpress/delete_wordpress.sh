@@ -98,4 +98,7 @@ else
     echo "Le script de suppression de l'utilisateur SFTP $WP_SFTP_REMOVE_USER_SCRIPT n'est pas présent."
 fi
 
+# Supprimer le repertoire des logs
+rm -rf "/usr/local/lsws/logs/vhosts/${DOMAIN_FOLDER}"
+
 echo "Suppression de ${DOMAIN} terminée"

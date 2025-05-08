@@ -77,10 +77,11 @@ async function manageWordPress(instanceId, message) {
     `"${message.wp_push_location  || ''}"`,
     `"${message.ftp_user  || ''}"`,
     `"${message.ftp_pwd  || ''}"`,
-    `"${message.maintenance_mode  || ''}"`,
-    `"${message.lscache  || ''}"`,
+    `"${message.toggle_maintenance_mode  || ''}"`,
+    `"${message.toggle_lscache  || ''}"`,
     `"${message.backup_type  || ''}"`,
-    `"${message.backup_location  || ''}"`
+    `"${message.backup_location  || ''}"`,
+    `"${message.toggle_wp_debug  || ''}"`
   ].join(' ');
 
   console.log('Exécution de la commande SSM:', command);
@@ -89,7 +90,8 @@ async function manageWordPress(instanceId, message) {
     InstanceIds: [instanceId],
     DocumentName: 'AWS-RunShellScript',
     Parameters: { commands: [command] },
-    TimeoutSeconds: 300
+    TimeoutSeconds: 300,
+    Comment: message.installation_method
   }).promise();
 
   // Attendre la fin de l'exécution

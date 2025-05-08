@@ -1,17 +1,18 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 5 ]; then
-    echo "Usage: $0 [WEB_ROOT] [WP_DB_NAME] [WP_DB_USER] [WP_DB_PASSWORD] [MYSQL_DB_HOST]"
+if [ "$#" -ne 6 ]; then
+    echo "Usage: $0 [DOMAIN_FOLDER] [WEB_ROOT] [WP_DB_NAME] [WP_DB_USER] [WP_DB_PASSWORD] [MYSQL_DB_HOST]"
     echo "Exemple: $0 ..."
     exit 1
 fi
 
-WEB_ROOT="$1"
-WP_DB_NAME="$2"
-WP_DB_USER="$3"
-WP_DB_PASSWORD="$4"
-MYSQL_DB_HOST="$5"
+DOMAIN_FOLDER="$1"
+WEB_ROOT="$2"
+WP_DB_NAME="$3"
+WP_DB_USER="$4"
+WP_DB_PASSWORD="$5"
+MYSQL_DB_HOST="$6"
 
 # Générer les clés de sécurité
 echo "Génération des clés de sécurité..."
@@ -45,7 +46,18 @@ define('LOGGED_IN_SALT',   '${LOGGED_IN_SALT}');
 define('NONCE_SALT',       '${NONCE_SALT}');
 
 \$table_prefix = 'wp_';
-define( 'WP_DEBUG', false );
+define('WP_DEBUG', false);  // true Active le mode débogage
+define('WP_DEBUG_LOG', false); // true écrit dans /wp-content/debug.log
+define('WP_DEBUG_DISPLAY', false); // false désactive l'affichage à l'écran
+
+// Modifier l'emplacement du fichier debug.log
+add_filter(
+    'wp_debug_log_location',
+    function() {
+        return '/usr/local/lsws/logs/vhosts/${DOMAIN_FOLDER}/wp-debug.log';
+    }
+);
+
 if ( ! defined( 'ABSPATH' ) ) {
   define( 'ABSPATH', __DIR__ . '/' );
 }

@@ -33,6 +33,9 @@ fi
 # Créer le répertoire du virtual host
 sudo mkdir -p "/usr/local/lsws/conf/vhosts/${DOMAIN_FOLDER}"
 
+# Créer le repertoire des logs du vhost
+sudo mkdir -p "/usr/local/lsws/logs/vhosts/${DOMAIN_FOLDER}"
+
 # Créer la configuration du virtual host
 echo "Configuration du virtual host..."
 sudo tee "${VHOST_CONF}" > /dev/null <<EOL
@@ -50,14 +53,34 @@ context / {
   rewrite  {
     enable                1
     inherit               1
-    rewriteFile           /var/www/${DOMAIN_FOLDER}/.htaccess
+    rewriteFile           /var/www/\$VH_NAME/.htaccess
   }
+}
+
+accesslog  {
+  useServer               0
+  logFormat              "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\""
+  logLevel               0
+  rollingSize            100M
+  keepDays               30
+  compressArchive        1
+  fileName               /usr/local/lsws/logs/vhosts/\$VH_NAME/access.log 
+}
+
+errorlog  {
+  useServer               0
+  logLevel               5
+  rollingSize            100M
+  keepDays               30
+  compressArchive        1
+  fileName               /usr/local/lsws/logs/vhosts/\$VH_NAME/error.log
 }
 
 rewrite  {
   enable                  1
   autoLoadHtaccess        1
 }
+
 EOL
 
 # Ajouter le virtualhost à la configuration principale

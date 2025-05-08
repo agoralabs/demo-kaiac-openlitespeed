@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 31 ]; then
+if [ "$#" -ne 32 ]; then
     echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
@@ -40,6 +40,7 @@ WP_MAINTENANCE_MODE="${28}" # provient du message SQS
 WP_LSCACHE="${29}" # provient du message SQS
 WP_BACKUP_TYPE="${30}" # provient du message SQS
 WP_BACKUP_S3_LOCATION="${31}" # provient du message SQS
+WP_TOGGLE_DEBUG="${32}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -67,6 +68,7 @@ WP_CONFIGURE_OPENLITESPEED="/home/ubuntu/configure_openlitespeed.sh"
 WP_CREATE_DNS_RECORD="/home/ubuntu/create_dns_record.sh"
 WP_CREATE_MYSQL_DATABASE="/home/ubuntu/create_mysql_database.sh"
 WP_DELETE_PARAMETER_STORE="/home/ubuntu/delete_parameters_store.sh"
+WP_TOGGLE_DEBUG_SCRIPT="/home/ubuntu/toggle_wp_debug.sh"
 
 # Fonction pour vérifier si l'installation nécessite une configuration complète
 needs_full_config() {
@@ -545,16 +547,20 @@ configure_mysql_database() {
         "$WP_DB_NAME" "$WP_DB_USER" "$WP_DB_PASSWORD"
 }
 
+restart_openlitespeed(){
+    echo "Redémarrage du service OpenLiteSpeed..."
+    sudo systemctl restart lsws
+}
+
 configure_wp_openlitespeed(){
     # Générer wp-config.php
-    $WP_CONFIGURE_WP_CONFIG "$WEB_ROOT" "$WP_DB_NAME" "$WP_DB_USER" "$WP_DB_PASSWORD" "$MYSQL_DB_HOST"
+    $WP_CONFIGURE_WP_CONFIG "$DOMAIN_FOLDER" "$WEB_ROOT" "$WP_DB_NAME" "$WP_DB_USER" "$WP_DB_PASSWORD" "$MYSQL_DB_HOST"
 
     # Configurer OpenLiteSpeed
     $WP_CONFIGURE_OPENLITESPEED "$DOMAIN" "$DOMAIN_FOLDER" "$WEB_ROOT" "$HTTPD_CONF" "$VHOST_CONF"
 
     # Redémarrer OpenLiteSpeed
-    echo "Redémarrage du service OpenLiteSpeed..."
-    sudo systemctl restart lsws
+    restart_openlitespeed
 
     # Créer un record DNS pour le domaine
     $WP_CREATE_DNS_RECORD "$RECORD_NAME" "$TOP_DOMAIN" "$ALB_TAG_NAME" "$ALB_TAG_VALUE"
@@ -624,6 +630,9 @@ case "$INSTALLATION_METHOD" in
                     "$MYSQL_ROOT_USER" "$MYSQL_ROOT_PASSWORD" "$RECORD_NAME" "$TOP_DOMAIN" \
                     "$WP_SFTP_USER"
         $WP_DELETE_PARAMETER_STORE "$DOMAIN_FOLDER"
+        ;;
+    "debug")
+        $WP_TOGGLE_DEBUG_SCRIPT "$WP_TOGGLE_DEBUG" "$DOMAIN_FOLDER"
         ;;
     *)
         echo "Traitement non reconnu: $INSTALLATION_METHOD"
