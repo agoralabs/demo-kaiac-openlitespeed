@@ -5,7 +5,7 @@
 scripts_wp=(
     "backup_wordpress.sh"
     "configure_openlitespeed.sh"
-    "configure_wp_config"
+    "configure_wp_config.sh"
     "create_dns_record.sh"
     "create_mysql_database.sh"
     "delete_wordpress.sh"
