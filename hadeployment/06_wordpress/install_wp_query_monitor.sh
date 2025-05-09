@@ -26,7 +26,7 @@ echo "🔄 Installation de Query Monitor..."
 wp --path="$WEB_ROOT" plugin install query-monitor --activate --allow-root
 
 # Vérification de l'installation
-if wp --path="$WP_DIR" plugin is-active query-monitor --allow-root; then
+if wp --path="$WEB_ROOT" plugin is-active query-monitor --allow-root; then
     echo "✅ Query Monitor a été installé et activé avec succès."
 else
     echo "❌ Une erreur s'est produite lors de l'installation."
