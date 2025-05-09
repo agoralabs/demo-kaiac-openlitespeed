@@ -43,7 +43,7 @@ activate_debug() {
 
     # Configurer wp-config.php via WP-CLI
     wp config set WP_DEBUG true --raw --path="$WEB_ROOT" --allow-root
-    wp config set WP_DEBUG_LOG "$LOG_DIR/$WP_DEBUG_FILENAME" --raw --path="$WEB_ROOT" --allow-root
+    wp config set WP_DEBUG_LOG "'$LOG_DIR/$WP_DEBUG_FILENAME'" --raw --path="$WEB_ROOT" --allow-root
     wp config set WP_DEBUG_DISPLAY false --raw --path="$WEB_ROOT" --allow-root
     
     echo "✅ Debug activé ! Logs écrits dans : $LOG_DIR/$WP_DEBUG_FILENAME"
