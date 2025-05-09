@@ -14,6 +14,8 @@ WP_DB_USER="$4"
 WP_DB_PASSWORD="$5"
 MYSQL_DB_HOST="$6"
 
+WP_DEBUG_FILENAME="wpDebug.log"
+
 # Fonction pour générer des clés aléatoires sécurisées
 generate_wordpress_key() {
     local chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?'
@@ -57,7 +59,7 @@ define('NONCE_SALT',       '${NONCE_SALT}');
 
 \$table_prefix = 'wp_';
 define('WP_DEBUG', false);  // true Active le mode débogage
-define('WP_DEBUG_LOG', '/usr/local/lsws/logs/vhosts/${DOMAIN_FOLDER}/wp-debug.log'); // par défaut écrit dans /wp-content/debug.log
+define('WP_DEBUG_LOG', '/usr/local/lsws/logs/vhosts/${DOMAIN_FOLDER}/${WP_DEBUG_FILENAME}'); // par défaut écrit dans /wp-content/debug.log
 define('WP_DEBUG_DISPLAY', false); // false désactive l'affichage à l'écran
 
 if ( ! defined( 'ABSPATH' ) ) {
