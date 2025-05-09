@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-# Tableau contenant les noms des scripts à télécharger
+# Tableaux contenant les noms des scripts à télécharger
 scripts_wp=(
     "backup_wordpress.sh"
     "configure_openlitespeed.sh"
@@ -18,6 +18,8 @@ scripts_wp=(
     "update_ols_rewrite_rules.sh"
     "delete_parameters_store.sh"
     "toggle_wp_debug.sh"
+    "install_wp_query_monitor.sh"
+    "toggle_wp_query_monitor.sh"
     )
 
 scripts_ftp=(

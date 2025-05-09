@@ -81,7 +81,8 @@ async function manageWordPress(instanceId, message) {
     `"${message.toggle_lscache  || ''}"`,
     `"${message.backup_type  || ''}"`,
     `"${message.backup_location  || ''}"`,
-    `"${message.toggle_wp_debug  || ''}"`
+    `"${message.toggle_wp_debug  || ''}"`,
+    `"${message.toggle_wp_query_monitor  || ''}"`
   ].join(' ');
 
   console.log('Exécution de la commande SSM:', command);

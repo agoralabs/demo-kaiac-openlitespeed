@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vérification des arguments
-if [ "$#" -ne 32 ]; then
+if [ "$#" -ne 33 ]; then
     echo "Usage: $0 <domain> <domain_folder> <wp_db_name> <wp_db_user> <wp_db_password> <mysql_host> <mysql_root_user> <mysql_root_password> <php_version> <wp_version>..."
     echo "Example: $0 example.com example wordpress_db wp_user secure_password localhost root root_password lsphp81 6.5.2"
     echo "Note: Pour la dernière version, utiliser 'latest' comme version"
@@ -41,6 +41,7 @@ WP_LSCACHE="${29}" # provient du message SQS
 WP_BACKUP_TYPE="${30}" # provient du message SQS
 WP_BACKUP_S3_LOCATION="${31}" # provient du message SQS
 WP_TOGGLE_DEBUG="${32}" # provient du message SQS
+WP_TOGGLE_QUERY_MONITOR="${33}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -69,6 +70,8 @@ WP_CREATE_DNS_RECORD="/home/ubuntu/create_dns_record.sh"
 WP_CREATE_MYSQL_DATABASE="/home/ubuntu/create_mysql_database.sh"
 WP_DELETE_PARAMETER_STORE="/home/ubuntu/delete_parameters_store.sh"
 WP_TOGGLE_DEBUG_SCRIPT="/home/ubuntu/toggle_wp_debug.sh"
+WP_INSTALL_QUERY_MONITOR_SCRIPT="/home/ubuntu/install_wp_query_monitor.sh"
+WP_TOGGLE_QUERY_MONITOR_SCRIPT="/home/ubuntu/toggle_wp_query_monitor.sh"
 
 # Fonction pour vérifier si l'installation nécessite une configuration complète
 needs_full_config() {
@@ -623,6 +626,12 @@ case "$INSTALLATION_METHOD" in
         ;;
     "debug")
         $WP_TOGGLE_DEBUG_SCRIPT "$WP_TOGGLE_DEBUG" "$DOMAIN_FOLDER"
+        ;;
+    "install_query_monitor")
+        $WP_INSTALL_QUERY_MONITOR_SCRIPT "$WEB_ROOT"
+        ;;
+    "toggle_query_monitor")
+        $WP_TOGGLE_QUERY_MONITOR_SCRIPT "$WP_TOGGLE_QUERY_MONITOR" "$WEB_ROOT"
         ;;
     *)
         echo "Traitement non reconnu: $INSTALLATION_METHOD"
