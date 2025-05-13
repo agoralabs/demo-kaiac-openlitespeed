@@ -16,7 +16,7 @@ WP_DB_USER="$4" # provient du message SQS
 WP_DB_PASSWORD="$5" # provient du message SQS
 MYSQL_DB_HOST="$6" # provient des variables d'environnement
 MYSQL_ROOT_USER="$7" # provient des variables d'environnement
-MYSQL_ROOT_PASSWORD="$8" # provient des variables d'environnement
+MYSQL_ROOT_PASSWORD_PARAM="$8" # provient des variables d'environnement
 PHP_VERSION="$9" # provient du message SQS
 WP_VERSION="${10}" # provient du message SQS
 INSTALLATION_METHOD="${11}" # provient du message SQS
@@ -26,22 +26,22 @@ GIT_USERNAME="${14}" # provient du message SQS
 GIT_TOKEN="${15}" # provient du message SQS
 RECORD_NAME="${16}" # provient du message SQS
 TOP_DOMAIN="${17}" # provient du message SQS
-ALB_TAG_NAME="${18}" # provient des variables d'environnement
-ALB_TAG_VALUE="${19}" # provient des variables d'environnement
-WP_ZIP_LOCATION="${20}" # provient du message SQS
-WP_DB_DUMP_LOCATION="${21}" # provient du message SQS
-WP_SOURCE_DOMAIN="${22}" # provient du message SQS
-WP_SOURCE_DOMAIN_FOLDER="${23}" # provient du message SQS
-WP_SOURCE_DB_NAME="${24}" # provient du message SQS
-WP_PUSH_LOCATION="${25}" # provient du message SQS
-WP_SFTP_USER="${26}" # provient du message SQS
-WP_SFTP_PWD="${27}" # provient du message SQS
-WP_MAINTENANCE_MODE="${28}" # provient du message SQS
-WP_LSCACHE="${29}" # provient du message SQS
-WP_BACKUP_TYPE="${30}" # provient du message SQS
-WP_BACKUP_S3_LOCATION="${31}" # provient du message SQS
-WP_TOGGLE_DEBUG="${32}" # provient du message SQS
-WP_TOGGLE_QUERY_MONITOR="${33}" # provient du message SQS
+ALB_DNS_NAME="${18}" # provient des variables d'environnement
+WP_ZIP_LOCATION="${19}" # provient du message SQS
+WP_DB_DUMP_LOCATION="${20}" # provient du message SQS
+WP_SOURCE_DOMAIN="${21}" # provient du message SQS
+WP_SOURCE_DOMAIN_FOLDER="${22}" # provient du message SQS
+WP_SOURCE_DB_NAME="${23}" # provient du message SQS
+WP_PUSH_LOCATION="${24}" # provient du message SQS
+WP_SFTP_USER="${25}" # provient du message SQS
+WP_SFTP_PWD="${26}" # provient du message SQS
+WP_MAINTENANCE_MODE="${27}" # provient du message SQS
+WP_LSCACHE="${28}" # provient du message SQS
+WP_BACKUP_TYPE="${29}" # provient du message SQS
+WP_BACKUP_S3_LOCATION="${30}" # provient du message SQS
+WP_TOGGLE_DEBUG="${31}" # provient du message SQS
+WP_TOGGLE_QUERY_MONITOR="${32}" # provient du message SQS
+WP_DOMAIN_CATEGORY="${33}" # provient du message SQS
 
 # Variables dérivées
 EMAIL_ADMIN="admin@${DOMAIN}"
@@ -72,6 +72,31 @@ WP_DELETE_PARAMETER_STORE="/home/ubuntu/delete_parameters_store.sh"
 WP_TOGGLE_DEBUG_SCRIPT="/home/ubuntu/toggle_wp_debug.sh"
 WP_INSTALL_QUERY_MONITOR_SCRIPT="/home/ubuntu/install_wp_query_monitor.sh"
 WP_TOGGLE_QUERY_MONITOR_SCRIPT="/home/ubuntu/toggle_wp_query_monitor.sh"
+
+
+
+# Fonction pour récupérer un SecureString depuis AWS Parameter Store
+get_ssm_parameter() {
+    local param_name="$1"
+    local region="${2:-us-west-2}"  # Par défaut: région eu-west-1 (à adapter)
+
+    # Récupération sécurisée via AWS CLI (version chiffrée)
+    local param_value
+    if param_value=$(aws ssm get-parameter \
+        --name "$param_name" \
+        --region "$region" \
+        --with-decryption \
+        --query "Parameter.Value" \
+        --output text 2>&1); then
+        echo "$param_value"
+    else
+        echo "Erreur lors de la récupération du paramètre: $param_value" >&2
+        return 1
+    fi
+}
+
+AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+MYSQL_ROOT_PASSWORD=$(get_ssm_parameter "$MYSQL_ROOT_PASSWORD_PARAM" "$AWS_REGION")
 
 # Fonction pour vérifier si l'installation nécessite une configuration complète
 needs_full_config() {
@@ -501,30 +526,9 @@ push_wordpress_site() {
     
     # Copie des fichiers
     copy_selected_files "$source_folder" "$target_folder"
-    
-    # Création de la base de données
-#     mysql -h "$db_host" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
-# CREATE DATABASE IF NOT EXISTS ${target_db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-# GRANT ALL PRIVILEGES ON ${target_db}.* TO '${db_user}'@'%';
-# FLUSH PRIVILEGES;
-# MYSQL_SCRIPT
 
     # Copie des tables
     copy_selected_tables "$source_db" "$target_db" "$db_host" "$source_domain" "$target_domain"
-    
-    # Search-replace si nécessaire
-    # perform_search_replace "$target_db" "$db_user" "$db_password" "$db_host" "$source_domain" "$target_domain"
-    
-    # Création du wp-config.php
-#     echo "Configuration de wp-config.php..."
-#     sudo cat > "${target_folder}/wp-config.php" <<EOL
-# <?php
-# define( 'DB_NAME', '${target_db}' );
-# define( 'DB_USER', '${db_user}' );
-# define( 'DB_PASSWORD', '${db_password}' );
-# define( 'DB_HOST', '${db_host}' );
-# [... reste du contenu inchangé ...]
-# EOL
     
     # Définition des permissions
     sudo chown -R www-data:www-data "$target_folder"
@@ -562,7 +566,7 @@ configure_wp_openlitespeed(){
 
     # Créer un record DNS pour le domaine
 
-    if ! $WP_CREATE_DNS_RECORD "$RECORD_NAME" "$TOP_DOMAIN" "$ALB_TAG_NAME" "$ALB_TAG_VALUE"; then
+    if ! $WP_CREATE_DNS_RECORD "$WP_DOMAIN_CATEGORY" "$RECORD_NAME" "$TOP_DOMAIN" "$ALB_DNS_NAME"; then
         echo "⚠️ Erreur dans $WP_CREATE_DNS_RECORD, mais on continue..."
     fi
 }

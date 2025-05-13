@@ -7,12 +7,17 @@ if [ "$#" -ne 4 ]; then
     exit 1
 fi
 
-RECORD_NAME="$1"
-TOP_DOMAIN="$2"
-ALB_TAG_NAME="$3"
-ALB_TAG_VALUE="$4"
+DOMAIN_CATEGORY=="$1"
+RECORD_NAME="$2"
+TOP_DOMAIN="$3"
+ALB_DNS_NAME="$4"
 
-echo "Création du record DNS pour le domaine $DOMAIN..."
+if [ "$DOMAIN_CATEGORY" = "declared" ]; then
+    echo "Pas de création du record DNS pour le domaine $TOP_DOMAIN..."
+    exit 0
+fi
+
+echo "Création du record DNS pour le domaine $TOP_DOMAIN..."
 
 # Variables AWS
 AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
@@ -20,31 +25,6 @@ HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$TOP_DOMAIN" 
 
 if [ -z "$HOSTED_ZONE_ID" ]; then
     echo "Zone hébergée pour le domaine $TOP_DOMAIN introuvable"
-    exit 1
-fi
-
-# Trouver l'ARN de l'ALB basé sur le tag
-ALB_ARN=$(aws resourcegroupstaggingapi get-resources \
-    --tag-filters "Key=$ALB_TAG_NAME,Values=$ALB_TAG_VALUE" \
-    --resource-type-filters elasticloadbalancing:loadbalancer \
-    --query "ResourceTagMappingList[0].ResourceARN" \
-    --output text \
-    --region $AWS_REGION)
-
-if [ -z "$ALB_ARN" ] || [ "$ALB_ARN" = "None" ]; then
-    echo "ALB avec le tag $ALB_TAG_NAME=$ALB_TAG_VALUE introuvable"
-    exit 1
-fi
-
-# Récupérer le DNS name de l'ALB
-ALB_DNS_NAME=$(aws elbv2 describe-load-balancers \
-    --load-balancer-arns "$ALB_ARN" \
-    --query "LoadBalancers[0].DNSName" \
-    --output text \
-    --region $AWS_REGION)
-
-if [ -z "$ALB_DNS_NAME" ]; then
-    echo "Impossible de récupérer le DNS name pour l'ALB $ALB_ARN"
     exit 1
 fi
 
