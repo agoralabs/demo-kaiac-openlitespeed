@@ -555,13 +555,17 @@ configure_wp_openlitespeed(){
     # Redémarrer OpenLiteSpeed
     restart_openlitespeed
 
-    # Créer un record DNS pour le domaine
-    $WP_CREATE_DNS_RECORD "$RECORD_NAME" "$TOP_DOMAIN" "$ALB_TAG_NAME" "$ALB_TAG_VALUE"
-
     # Créer un utilisateur SFTP
-    $WP_SFTP_ADD_USER_SCRIPT "$DOMAIN_FOLDER" "$WP_SFTP_USER" "$WP_SFTP_PWD"    
-}
+    if ! $WP_SFTP_ADD_USER_SCRIPT "$DOMAIN_FOLDER" "$WP_SFTP_USER" "$WP_SFTP_PWD"; then
+        echo "⚠️ Erreur dans $WP_SFTP_ADD_USER_SCRIPT, mais on continue..."
+    fi
 
+    # Créer un record DNS pour le domaine
+
+    if ! $WP_CREATE_DNS_RECORD "$RECORD_NAME" "$TOP_DOMAIN" "$ALB_TAG_NAME" "$ALB_TAG_VALUE"; then
+        echo "⚠️ Erreur dans $WP_CREATE_DNS_RECORD, mais on continue..."
+    fi
+}
 
 # Installation selon la méthode choisie
 case "$INSTALLATION_METHOD" in
