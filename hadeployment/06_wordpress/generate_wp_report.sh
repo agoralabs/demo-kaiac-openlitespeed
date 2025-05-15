@@ -7,7 +7,7 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-WEB_ROOT="$1"
+WEB_ROOT="${1%/}"
 REPORT_FILE="$WEB_ROOT/wp-config-report.json"
 
 # Vérification de WP-CLI
@@ -22,21 +22,38 @@ wp_cmd() {
     local default="$2"
     local result
     
-    result=$(wp --allow-root --path="$WEB_ROOT" $cmd 2>/dev/null)
+    # Exécution silencieuse de la commande
+    result=$(wp --allow-root --path="$WEB_ROOT" $cmd --quiet 2>/dev/null)
     
     if [ $? -ne 0 ] || [ -z "$result" ]; then
         echo "$default"
     else
-        echo "$result"
+        # Nettoyage des sauts de ligne et guillemets
+        echo "$result" | tr -d '\n\r"' | sed "s/'/\"/g"
     fi
 }
 
-# Fonction pour obtenir les options avec formatage JSON sécurisé
-get_wp_option() {
+# Fonction spéciale pour les options qui nécessitent un formatage JSON
+get_wp_option_json() {
     local option_name="$1"
     local default_value="$2"
     
-    wp_cmd "option get $option_name --format=json" "$default_value"
+    # Essaye d'abord avec --format=json, sinon avec format brut
+    local result=$(wp --allow-root --path="$WEB_ROOT" option get "$option_name" --format=json 2>/dev/null || \
+                   wp --allow-root --path="$WEB_ROOT" option get "$option_name" 2>/dev/null)
+    
+    if [ -z "$result" ]; then
+        echo "$default_value"
+    else
+        # Convertit en JSON valide
+        if [[ "$result" =~ ^[0-9]+$ ]]; then
+            echo "$result"
+        elif [[ "$result" =~ ^(true|false)$ ]]; then
+            echo "$result"
+        else
+            echo "\"$result\""
+        fi
+    fi
 }
 
 # Fonction pour obtenir les constantes de configuration
@@ -44,7 +61,20 @@ get_wp_config() {
     local constant_name="$1"
     local default_value="$2"
     
-    wp_cmd "config get $constant_name --format=json" "$default_value"
+    local result=$(wp --allow-root --path="$WEB_ROOT" config get "$constant_name" 2>/dev/null)
+    
+    if [ -z "$result" ]; then
+        echo "$default_value"
+    else
+        # Convertit en JSON valide
+        if [[ "$result" =~ ^[0-9]+$ ]]; then
+            echo "$result"
+        elif [[ "$result" =~ ^(true|false)$ ]]; then
+            echo "$result"
+        else
+            echo "\"$result\""
+        fi
+    fi
 }
 
 # Génération du rapport JSON
@@ -55,40 +85,40 @@ get_wp_config() {
     
     # 1. Informations de base
     echo "\"basic_info\": {"
-    echo "\"site_url\": $(get_wp_option 'siteurl' '""'),"
-    echo "\"home_url\": $(get_wp_option 'home' '""'),"
-    echo "\"wp_version\": $(wp --allow-root --path="$WEB_ROOT" core version --quiet --format=json || echo '""'),"
+    echo "\"site_url\": $(get_wp_option_json 'siteurl' '""'),"
+    echo "\"home_url\": $(get_wp_option_json 'home' '""'),"
+    echo "\"wp_version\": \"$(wp --allow-root --path="$WEB_ROOT" core version --quiet 2>/dev/null || echo '')\","
     echo "\"language\": $(wp_cmd 'core language list --status=active --fields=code,name --format=json' '[]')"
     echo "},"
     
     # 2. Configuration générale
     echo "\"general_config\": {"
-    echo "\"blogname\": $(get_wp_option 'blogname' '""'),"
-    echo "\"blogdescription\": $(get_wp_option 'blogdescription' '""'),"
-    echo "\"admin_email\": $(get_wp_option 'admin_email' '""'),"
-    echo "\"timezone_string\": $(get_wp_option 'timezone_string' '""'),"
-    echo "\"date_format\": $(get_wp_option 'date_format' '""'),"
-    echo "\"time_format\": $(get_wp_option 'time_format' '""'),"
-    echo "\"start_of_week\": $(get_wp_option 'start_of_week' '0')"
+    echo "\"blogname\": $(get_wp_option_json 'blogname' '""'),"
+    echo "\"blogdescription\": $(get_wp_option_json 'blogdescription' '""'),"
+    echo "\"admin_email\": $(get_wp_option_json 'admin_email' '""'),"
+    echo "\"timezone_string\": $(get_wp_option_json 'timezone_string' '""'),"
+    echo "\"date_format\": $(get_wp_option_json 'date_format' '""'),"
+    echo "\"time_format\": $(get_wp_option_json 'time_format' '""'),"
+    echo "\"start_of_week\": $(get_wp_option_json 'start_of_week' '0')"
     echo "},"
     
     # 3. Paramètres de lecture
     echo "\"reading_settings\": {"
-    echo "\"show_on_front\": $(get_wp_option 'show_on_front' '""'),"
-    echo "\"page_on_front\": $(get_wp_option 'page_on_front' '0'),"
-    echo "\"page_for_posts\": $(get_wp_option 'page_for_posts' '0'),"
-    echo "\"posts_per_page\": $(get_wp_option 'posts_per_page' '10')"
+    echo "\"show_on_front\": $(get_wp_option_json 'show_on_front' '""'),"
+    echo "\"page_on_front\": $(get_wp_option_json 'page_on_front' '0'),"
+    echo "\"page_for_posts\": $(get_wp_option_json 'page_for_posts' '0'),"
+    echo "\"posts_per_page\": $(get_wp_option_json 'posts_per_page' '10')"
     echo "},"
     
     # 4. Paramètres de discussion
     echo "\"discussion_settings\": {"
-    echo "\"default_comment_status\": $(get_wp_option 'default_comment_status' '""'),"
-    echo "\"comment_registration\": $(get_wp_option 'comment_registration' '0'),"
-    echo "\"require_name_email\": $(get_wp_option 'require_name_email' '0'),"
-    echo "\"close_comments_for_old_posts\": $(get_wp_option 'close_comments_for_old_posts' '0'),"
-    echo "\"close_comments_days_old\": $(get_wp_option 'close_comments_days_old' '14'),"
-    echo "\"thread_comments\": $(get_wp_option 'thread_comments' '0'),"
-    echo "\"thread_comments_depth\": $(get_wp_option 'thread_comments_depth' '5')"
+    echo "\"default_comment_status\": $(get_wp_option_json 'default_comment_status' '""'),"
+    echo "\"comment_registration\": $(get_wp_option_json 'comment_registration' '0'),"
+    echo "\"require_name_email\": $(get_wp_option_json 'require_name_email' '0'),"
+    echo "\"close_comments_for_old_posts\": $(get_wp_option_json 'close_comments_for_old_posts' '0'),"
+    echo "\"close_comments_days_old\": $(get_wp_option_json 'close_comments_days_old' '14'),"
+    echo "\"thread_comments\": $(get_wp_option_json 'thread_comments' '0'),"
+    echo "\"thread_comments_depth\": $(get_wp_option_json 'thread_comments_depth' '5')"
     echo "},"
     
     # 5. Thème et extensions
@@ -113,11 +143,14 @@ get_wp_config() {
     echo "}"
 } > "$REPORT_FILE"
 
-# Vérification du fichier JSON généré
-if jq empty "$REPORT_FILE" >/dev/null 2>&1; then
+# Vérification et minification du JSON
+if jq -e . >/dev/null 2>&1 < "$REPORT_FILE"; then
+    # Minifier le JSON
+    jq -c . < "$REPORT_FILE" > "${REPORT_FILE}.tmp" && mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
     echo "Rapport généré avec succès dans $REPORT_FILE"
+    exit 0
 else
-    echo "{\"error\":\"Échec de la génération du rapport JSON\"}" > "$REPORT_FILE"
+    echo "{\"error\":\"Échec de la génération du rapport JSON\",\"details\":\"$(cat "$REPORT_FILE" | tr -d '\n')\"}" > "$REPORT_FILE"
     echo "Erreur lors de la génération du rapport JSON" >&2
     exit 1
 fi
