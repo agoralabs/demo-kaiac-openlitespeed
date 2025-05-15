@@ -8,130 +8,116 @@ if [ -z "$1" ]; then
 fi
 
 WEB_ROOT="$1"
+REPORT_FILE="$WEB_ROOT/wp-config-report.json"
 
 # Vérification de WP-CLI
 if ! command -v wp &> /dev/null; then
-    echo "{\"error\":\"WP-CLI n'est pas installé\"}" > "$WEB_ROOT/wp-config-report.json"
+    echo "{\"error\":\"WP-CLI n'est pas installé\"}" > "$REPORT_FILE"
     exit 1
 fi
 
-# Vérification du contexte WordPress
-if ! wp --allow-root --path="$WEB_ROOT" core is-installed 2>/dev/null; then
-    echo "{\"error\":\"Ceci n'est pas une installation WordPress valide\"}" > "$WEB_ROOT/wp-config-report.json"
-    exit 1
-fi
-
-# Fonction pour récupérer les données au format JSON
-generate_wp_report() {
-    # 1. Informations de base
-    local site_url=$(wp --allow-root --path="$WEB_ROOT" option get siteurl --format=json)
-    local home_url=$(wp --allow-root --path="$WEB_ROOT" option get home --format=json)
-    local wp_version=$(wp --allow-root --path="$WEB_ROOT" core version --format=json)
-    local language=$(wp --allow-root --path="$WEB_ROOT" core language list --status=active --fields=code,name --format=json)
-
-    # 2. Configuration générale
-    local general_config=$(wp --allow-root --path="$WEB_ROOT" option get --format=json \
-        blogname \
-        blogdescription \
-        admin_email \
-        timezone_string \
-        date_format \
-        time_format \
-        start_of_week
-    )
-
-    # 3. Paramètres de lecture
-    local reading_settings=$(wp --allow-root --path="$WEB_ROOT" option get --format=json \
-        show_on_front \
-        page_on_front \
-        page_for_posts \
-        posts_per_page
-    )
-
-    # 4. Paramètres de discussion
-    local discussion_settings=$(wp --allow-root --path="$WEB_ROOT" option get --format=json \
-        default_comment_status \
-        comment_registration \
-        require_name_email \
-        close_comments_for_old_posts \
-        close_comments_days_old \
-        thread_comments \
-        thread_comments_depth
-    )
-
-    # 5. Thème et extensions
-    local active_theme=$(wp --allow-root --path="$WEB_ROOT" theme list --status=active --fields=name,title,version,status --format=json)
-    local active_plugins=$(wp --allow-root --path="$WEB_ROOT" plugin list --status=active --fields=name,title,version,status --format=json)
-    local mu_plugins=$(wp --allow-root --path="$WEB_ROOT" plugin list --status=must-use --fields=name,title,version,status --format=json)
-
-    # 6. Configuration avancée
-    local db_name=$(wp --allow-root --path="$WEB_ROOT" config get DB_NAME --format=json)
-    local db_user=$(wp --allow-root --path="$WEB_ROOT" config get DB_USER --format=json)
-    local db_host=$(wp --allow-root --path="$WEB_ROOT" config get DB_HOST --format=json)
-    local table_prefix=$(wp --allow-root --path="$WEB_ROOT" config get table_prefix --format=json)
-    local wp_debug=$(wp --allow-root --path="$WEB_ROOT" config get WP_DEBUG --format=json)
-    local wp_debug_log=$(wp --allow-root --path="$WEB_ROOT" config get WP_DEBUG_LOG --format=json)
-    local wp_debug_display=$(wp --allow-root --path="$WEB_ROOT" config get WP_DEBUG_DISPLAY --format=json)
-    local script_debug=$(wp --allow-root --path="$WEB_ROOT" config get SCRIPT_DEBUG --format=json)
-    local wp_cache=$(wp --allow-root --path="$WEB_ROOT" config get WP_CACHE --format=json)
-
-    # Construction de l'objet JSON complet
-    jq -n \
-        --arg date "$(date -Iseconds)" \
-        --arg web_root "$WEB_ROOT" \
-        --argjson site_url "$site_url" \
-        --argjson home_url "$home_url" \
-        --argjson wp_version "$wp_version" \
-        --argjson language "$language" \
-        --argjson general_config "$general_config" \
-        --argjson reading_settings "$reading_settings" \
-        --argjson discussion_settings "$discussion_settings" \
-        --argjson active_theme "$active_theme" \
-        --argjson active_plugins "$active_plugins" \
-        --argjson mu_plugins "$mu_plugins" \
-        --argjson db_name "$db_name" \
-        --argjson db_user "$db_user" \
-        --argjson db_host "$db_host" \
-        --argjson table_prefix "$table_prefix" \
-        --argjson wp_debug "$wp_debug" \
-        --argjson wp_debug_log "$wp_debug_log" \
-        --argjson wp_debug_display "$wp_debug_display" \
-        --argjson script_debug "$script_debug" \
-        --argjson wp_cache "$wp_cache" \
-        '{
-            "report_date": $date,
-            "web_root": $web_root,
-            "basic_info": {
-                "site_url": $site_url,
-                "home_url": $home_url,
-                "wp_version": $wp_version,
-                "language": $language
-            },
-            "general_config": $general_config,
-            "reading_settings": $reading_settings,
-            "discussion_settings": $discussion_settings,
-            "theme": $active_theme,
-            "plugins": {
-                "active": $active_plugins,
-                "must_use": $mu_plugins
-            },
-            "advanced_config": {
-                "db_name": $db_name,
-                "db_user": $db_user,
-                "db_host": $db_host,
-                "table_prefix": $table_prefix,
-                "wp_debug": $wp_debug,
-                "wp_debug_log": $wp_debug_log,
-                "wp_debug_display": $wp_debug_display,
-                "script_debug": $script_debug,
-                "wp_cache": $wp_cache
-            }
-        }'
+# Fonction pour exécuter les commandes WP-CLI avec gestion des erreurs
+wp_cmd() {
+    local cmd="$1"
+    local default="$2"
+    local result
+    
+    result=$(wp --allow-root --path="$WEB_ROOT" $cmd 2>/dev/null)
+    
+    if [ $? -ne 0 ] || [ -z "$result" ]; then
+        echo "$default"
+    else
+        echo "$result"
+    fi
 }
 
-# Génération du rapport
-generate_wp_report 
+# Fonction pour obtenir les options avec formatage JSON sécurisé
+get_wp_option() {
+    local option_name="$1"
+    local default_value="$2"
+    
+    wp_cmd "option get $option_name --format=json" "$default_value"
+}
 
-# > "$WEB_ROOT/wp-config-report.json"
+# Fonction pour obtenir les constantes de configuration
+get_wp_config() {
+    local constant_name="$1"
+    local default_value="$2"
+    
+    wp_cmd "config get $constant_name --format=json" "$default_value"
+}
 
-#echo "Rapport généré dans $WEB_ROOT/wp-config-report.json"
+# Génération du rapport JSON
+{
+    echo "{"
+    echo "\"report_date\": \"$(date -Iseconds)\","
+    echo "\"web_root\": \"$WEB_ROOT\","
+    
+    # 1. Informations de base
+    echo "\"basic_info\": {"
+    echo "\"site_url\": $(get_wp_option 'siteurl' '""'),"
+    echo "\"home_url\": $(get_wp_option 'home' '""'),"
+    echo "\"wp_version\": $(wp --allow-root --path="$WEB_ROOT" core version --quiet --format=json || echo '""'),"
+    echo "\"language\": $(wp_cmd 'core language list --status=active --fields=code,name --format=json' '[]')"
+    echo "},"
+    
+    # 2. Configuration générale
+    echo "\"general_config\": {"
+    echo "\"blogname\": $(get_wp_option 'blogname' '""'),"
+    echo "\"blogdescription\": $(get_wp_option 'blogdescription' '""'),"
+    echo "\"admin_email\": $(get_wp_option 'admin_email' '""'),"
+    echo "\"timezone_string\": $(get_wp_option 'timezone_string' '""'),"
+    echo "\"date_format\": $(get_wp_option 'date_format' '""'),"
+    echo "\"time_format\": $(get_wp_option 'time_format' '""'),"
+    echo "\"start_of_week\": $(get_wp_option 'start_of_week' '0')"
+    echo "},"
+    
+    # 3. Paramètres de lecture
+    echo "\"reading_settings\": {"
+    echo "\"show_on_front\": $(get_wp_option 'show_on_front' '""'),"
+    echo "\"page_on_front\": $(get_wp_option 'page_on_front' '0'),"
+    echo "\"page_for_posts\": $(get_wp_option 'page_for_posts' '0'),"
+    echo "\"posts_per_page\": $(get_wp_option 'posts_per_page' '10')"
+    echo "},"
+    
+    # 4. Paramètres de discussion
+    echo "\"discussion_settings\": {"
+    echo "\"default_comment_status\": $(get_wp_option 'default_comment_status' '""'),"
+    echo "\"comment_registration\": $(get_wp_option 'comment_registration' '0'),"
+    echo "\"require_name_email\": $(get_wp_option 'require_name_email' '0'),"
+    echo "\"close_comments_for_old_posts\": $(get_wp_option 'close_comments_for_old_posts' '0'),"
+    echo "\"close_comments_days_old\": $(get_wp_option 'close_comments_days_old' '14'),"
+    echo "\"thread_comments\": $(get_wp_option 'thread_comments' '0'),"
+    echo "\"thread_comments_depth\": $(get_wp_option 'thread_comments_depth' '5')"
+    echo "},"
+    
+    # 5. Thème et extensions
+    echo "\"theme\": $(wp_cmd 'theme list --status=active --fields=name,title,version,status --format=json' '[]'),"
+    echo "\"plugins\": {"
+    echo "\"active\": $(wp_cmd 'plugin list --status=active --fields=name,title,version,status --format=json' '[]'),"
+    echo "\"must_use\": $(wp_cmd 'plugin list --status=must-use --fields=name,title,version,status --format=json' '[]')"
+    echo "},"
+    
+    # 6. Configuration avancée
+    echo "\"advanced_config\": {"
+    echo "\"db_name\": $(get_wp_config 'DB_NAME' '""'),"
+    echo "\"db_user\": $(get_wp_config 'DB_USER' '""'),"
+    echo "\"db_host\": $(get_wp_config 'DB_HOST' '""'),"
+    echo "\"table_prefix\": $(get_wp_config 'table_prefix' '""'),"
+    echo "\"wp_debug\": $(get_wp_config 'WP_DEBUG' 'false'),"
+    echo "\"wp_debug_log\": $(get_wp_config 'WP_DEBUG_LOG' 'false'),"
+    echo "\"wp_debug_display\": $(get_wp_config 'WP_DEBUG_DISPLAY' 'true'),"
+    echo "\"script_debug\": $(get_wp_config 'SCRIPT_DEBUG' 'false'),"
+    echo "\"wp_cache\": $(get_wp_config 'WP_CACHE' 'false')"
+    echo "}"
+    echo "}"
+} > "$REPORT_FILE"
+
+# Vérification du fichier JSON généré
+if jq empty "$REPORT_FILE" >/dev/null 2>&1; then
+    echo "Rapport généré avec succès dans $REPORT_FILE"
+else
+    echo "{\"error\":\"Échec de la génération du rapport JSON\"}" > "$REPORT_FILE"
+    echo "Erreur lors de la génération du rapport JSON" >&2
+    exit 1
+fi
