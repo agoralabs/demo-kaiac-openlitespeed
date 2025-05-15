@@ -20,6 +20,7 @@ scripts_wp=(
     "toggle_wp_debug.sh"
     "install_wp_query_monitor.sh"
     "toggle_wp_query_monitor.sh"
+    "generate_wp_report.sh"
     )
 
 scripts_ftp=(
