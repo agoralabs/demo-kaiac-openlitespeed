@@ -141,16 +141,19 @@ get_wp_config() {
     echo "\"wp_cache\": $(get_wp_config 'WP_CACHE' 'false')"
     echo "}"
     echo "}"
-} > "$REPORT_FILE"
+} 
 
+#> "$REPORT_FILE"
+
+#cat "$REPORT_FILE"
 # Vérification et minification du JSON
-if jq -e . >/dev/null 2>&1 < "$REPORT_FILE"; then
-    # Minifier le JSON
-    jq -c . < "$REPORT_FILE" > "${REPORT_FILE}.tmp" && mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
-    echo "Rapport généré avec succès dans $REPORT_FILE"
-    exit 0
-else
-    echo "{\"error\":\"Échec de la génération du rapport JSON\",\"details\":\"$(cat "$REPORT_FILE" | tr -d '\n')\"}" > "$REPORT_FILE"
-    echo "Erreur lors de la génération du rapport JSON" >&2
-    exit 1
-fi
+# if jq -e . >/dev/null 2>&1 < "$REPORT_FILE"; then
+#     # Minifier le JSON
+#     jq -c . < "$REPORT_FILE" > "${REPORT_FILE}.tmp" && mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+#     echo "Rapport généré avec succès dans $REPORT_FILE"
+#     exit 0
+# else
+#     echo "{\"error\":\"Échec de la génération du rapport JSON\",\"details\":\"$(cat "$REPORT_FILE" | tr -d '\n')\"}" > "$REPORT_FILE"
+#     echo "Erreur lors de la génération du rapport JSON" >&2
+#     exit 1
+# fi
