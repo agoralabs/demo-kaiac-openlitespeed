@@ -37,9 +37,12 @@ activate_debug() {
     
     # Créer le dossier de logs et définir les permissions
     mkdir -p "$LOG_DIR"
-    touch "$LOG_DIR/$WP_DEBUG_FILENAME"
-    chown "$DEFAULT_USER":"$DEFAULT_USER" "$LOG_DIR/$WP_DEBUG_FILENAME"
-    chmod 640 "$LOG_DIR/$WP_DEBUG_FILENAME"
+    touch "$LOG_DIR/$WP_DEBUG_FILENAME"    
+    # Résoudre problème fichier debug WordPress vide
+    chown -R nobody:nogroup $LOG_DIR
+    chmod -R 755 $LOG_DIR
+    chown nobody:nogroup "$LOG_DIR/$WP_DEBUG_FILENAME"
+    chmod 644 "$LOG_DIR/$WP_DEBUG_FILENAME"
 
     # Configurer wp-config.php via WP-CLI
     wp config set WP_DEBUG true --raw --path="$WEB_ROOT" --allow-root

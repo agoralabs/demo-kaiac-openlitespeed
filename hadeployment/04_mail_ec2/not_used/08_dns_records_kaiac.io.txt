@@ -1,8 +1,8 @@
-$ORIGIN kaiac.io.
+$ORIGIN agoralabs.org.
 @	IN	MX	mail.skyscaledev.com
 autodiscover	IN	CNAME	mail.skyscaledev.com
 _autodiscover._tcp	IN	SRV	mail.skyscaledev.com 443
 autoconfig	IN	CNAME	mail.skyscaledev.com
 ;@	IN	TXT	**TODO**
-;_dmarc	IN	TXT	**TODO**
-dkim._domainkey	IN	TXT	v=DKIM1;k=rsa;t=s;s=email;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqirNkcSlMsOTGSVwBGP/hM5fceYTN0rnRhkyeFto3c2JUv0ZKTqH4pEiaz+/Q+xzv8dAFP9kHCVGNsPZpnCwRv6zqZBNgzp85zTeYm1fwqmWFzYQ70mbpj9hMF29Qu5WHbIOJsm6pTtSR2xvpy53qvlv4E/yE6Oos/2AuSI06deQRJHl1Mlj3WBx0qkLS7MUsisvdxKuGmfq96ORS6ymtqRTvZ/hyQR3GG+RZe586u80cNndDKxKHGhDGipSApVtnoDSlsXe+WO+y3rTJ7JVLWDhO2QKyhbNsWnQBBLQz+xEZ0VXN69kBhPMV9iMrRqcLT/2N9fllZS2PFIrfrxVfQIDAQAB
+_dmarc	IN	TXT	v=DMARC1;p=none;rua=mailto:rua@dmarc.brevo.com
+dkim._domainkey	IN	TXT	v=DKIM1;k=rsa;t=s;s=email;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArx9+NOfm59FqSh52WK1SP0QpKxAdR5otaEAieqHvlSy2cGKXKXA+OkzpCS4xLGTXCRkhh1w+jX0+rCMgqUQPLZrhYq7Kd0wCjroxMsg19Zb9HMz0bbeMrX/wlR1oGIzTYySrbiU/DItjvgzf4zPNqxxUmzyG481P0gwP+V8SigNlZEapT1JsKZ4On2BlyX7MXjgLnScmtI5aUEt07c/RnowtzAHsNcz0SkPqCY7b9hgngCIPNaJ/iLfH0ag5nX5A5tsEnDkBSpih51vxtPAsnU9hHsiBPPCVsqhWUsKqssbaZuf6q7ZCvHjscgZvagIefBBpelbStZCdWGn4q6ZWNQIDAQAB

@@ -17,7 +17,7 @@ WP_SFTP_REMOVE_USER_SCRIPT="/home/ubuntu/remove_sftp_user.sh"
 # 1. Supprimer la base de données
 mysql -h "${MYSQL_DB_HOST}" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
 DROP DATABASE IF EXISTS ${WP_DB_NAME};
-DROP USER IF EXISTS '${WP_DB_NAME}_user'@'%';
+DROP USER IF EXISTS '${WP_DB_NAME}_usr'@'%';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 
