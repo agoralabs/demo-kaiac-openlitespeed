@@ -21,6 +21,7 @@ scripts_wp=(
     "install_wp_query_monitor.sh"
     "toggle_wp_query_monitor.sh"
     "generate_wp_report.sh"
+    "size_checker.sh"
     )
 
 scripts_ftp=(
