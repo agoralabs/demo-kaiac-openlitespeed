@@ -22,6 +22,7 @@ scripts_wp=(
     "toggle_wp_query_monitor.sh"
     "generate_wp_report.sh"
     "size_checker.sh"
+    "toggle_vhost_suspension.sh"
     )
 
 scripts_ftp=(

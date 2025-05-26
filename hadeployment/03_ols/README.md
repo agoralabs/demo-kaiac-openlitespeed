@@ -89,72 +89,8 @@ TOTAL DEMOLITION DURATION : 21m:47s
 ```
 
 
-# Téléchargement des scripts sh
+# Accéder à l'admin OLS
 
-curl -o delete_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/wordpress_ols_ansible_https/delete_wordpress.sh
+https://ec2ols.skyscaledev.com:7080/login.php
 
-
-curl -o deploy_wordpress.sh https://raw.githubusercontent.com/agoralabs/demo-kaiac-openlitespeed/refs/heads/main/wordpress_ols_ansible_https/deploy_wordpress.sh
-
-# Test la fonction Lambda
-
-{
-  "Records": [
-    {
-      "messageId": "19dd0b57-b21e-4ac1-bd88-01bbb068cb78",
-      "receiptHandle": "MessageReceiptHandle",
-      "body": "{\"command\":\"CREATE_WP\",\"domain\":\"site1.kaiac.io\",\"domain_folder\":\"site1_kaiac_io\",\"wp_db_name\":\"site1_kaiac_io_db\",\"wp_db_user\":\"wp_user\",\"wp_db_password\":\"=Dorine11\",\"php_version\":\"lsphp81\",\"wp_version\":\"6.5.2\"}",
-      "attributes": {
-        "ApproximateReceiveCount": "1",
-        "SentTimestamp": "1523232000000",
-        "SenderId": "123456789012",
-        "ApproximateFirstReceiveTimestamp": "1523232000001"
-        },
-      "messageAttributes": {},
-      "md5OfBody": "{{{md5_of_body}}}",
-      "eventSource": "aws:sqs",
-      "eventSourceARN": "arn:aws:sqs:us-west-2:041292242005:wordpress-site-queue.fifo",
-      "awsRegion": "us-west-2"
-
-    }
-  ]
-}
-
-# Logs d'execution du script shell déclenché par Lambda
-
-=== Configuration du déploiement WordPress ===
-Domaine: site2.skyscaledev.com
-Dossier: /var/www/site2_skyscaledev_com
-Version WordPress: 6.5.2
-Base de données: site2_skyscaledev_com_db
-Utilisateur DB: site2_skyscaledev_com_db_usr
-Hôte MySQL: dbols.skyscaledev.com
-Version PHP: lsphp81
-============================================
-Installation des dépendances...
-Création du dossier du site...
-Le dossier existe mais n'est pas un dépôt Git.
-Suppression du contenu existant et nouveau clonage...
-Génération des clés de sécurité...
-Configuration de wp-config.php...
-Configuration de la base de données MySQL...
-Configuration d'OpenLiteSpeed...
-Configuration du virtual host...
-Ajout du virtualhost...
-Ajout de la règle map...
-Redémarrage du service OpenLiteSpeed...
-{
-    "ChangeInfo": {
-        "Id": "/change/C01837583LWI48037P9LR",
-        "Status": "PENDING",
-        "SubmittedAt": "2025-04-25T17:43:12.008000+00:00",
-        "Comment": "Création de l'enregistrement site2.skyscaledev.com"
-    }
-}
-Enregistrement DNS site2.site2.skyscaledev.com créé/modifié pour pointer vers ols-alb-prod-lb-182125202.us-west-2.elb.amazonaws.com
-=== Déploiement terminé avec succès ===
-URL: http://site2.skyscaledev.com
-Methode: git
-Répertoire WordPress: /var/www/site2_skyscaledev_com
-Base de données: site2_skyscaledev_com_db
-======================================
+admin : mot de passe de dorine onzième du style
