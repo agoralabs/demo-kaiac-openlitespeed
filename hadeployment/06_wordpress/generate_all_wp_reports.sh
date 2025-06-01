@@ -1,15 +1,16 @@
 #!/bin/bash
 
 # Vérification des paramètres requis
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
-    echo "Usage: $0 [MYSQL_DB_HOST] [MYSQL_ROOT_USER] [MYSQL_ROOT_PASSWORD]"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+    echo "Usage: $0 [MYSQL_DB_HOST] [MYSQL_DB_NAME] [MYSQL_ROOT_USER] [MYSQL_ROOT_PASSWORD]"
     echo "{\"error\":\"Paramètres manquants\"}" > websites_report.json
     exit 1
 fi
 
 MYSQL_DB_HOST="$1"
-MYSQL_ROOT_USER="$2"
-MYSQL_ROOT_PASSWORD="$3"
+MYSQL_DB_NAME="$2"  # Nouveau paramètre pour le nom de la base de données
+MYSQL_ROOT_USER="$3"
+MYSQL_ROOT_PASSWORD="$4"
 WEB_ROOT="/var/www"
 
 # Fonction pour échapper les caractères spéciaux dans les chaînes JSON
@@ -40,7 +41,7 @@ mysql_query() {
 # Récupération de la liste des sites actifs
 get_active_websites() {
     local query="SELECT domain, folder_name FROM websites WHERE is_active = 1;"
-    local result=$(mysql_query "$query" "")
+    local result=$(mysql -h "$MYSQL_DB_HOST" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DB_NAME" -sse "$query" 2>/dev/null)
     
     if [ -z "$result" ]; then
         echo "[]"
