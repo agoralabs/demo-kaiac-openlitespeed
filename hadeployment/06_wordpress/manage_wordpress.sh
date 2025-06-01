@@ -72,8 +72,7 @@ WP_DELETE_PARAMETER_STORE="/home/ubuntu/delete_parameters_store.sh"
 WP_TOGGLE_DEBUG_SCRIPT="/home/ubuntu/toggle_wp_debug.sh"
 WP_INSTALL_QUERY_MONITOR_SCRIPT="/home/ubuntu/install_wp_query_monitor.sh"
 WP_TOGGLE_QUERY_MONITOR_SCRIPT="/home/ubuntu/toggle_wp_query_monitor.sh"
-
-
+UPDATE_SITE_PROCESSING_SCRIPT="/home/ubuntu/update_is_processing_site.sh"
 
 # Fonction pour récupérer un SecureString depuis AWS Parameter Store
 get_ssm_parameter() {
@@ -578,12 +577,14 @@ case "$INSTALLATION_METHOD" in
         configure_mysql_database
         install_wordpress_standard "$WEB_ROOT" "$WP_VERSION"
         configure_wp_openlitespeed
+        $UPDATE_SITE_PROCESSING_SCRIPT "$RECORD_NAME" "$TOP_DOMAIN"
         ;;
     "git")
         create_wordpress_folder "$WEB_ROOT"
         configure_mysql_database
         install_wordpress_git "$WEB_ROOT" "$GIT_REPO_URL" "$GIT_BRANCH" "$GIT_USERNAME" "$GIT_TOKEN"
         configure_wp_openlitespeed
+        $UPDATE_SITE_PROCESSING_SCRIPT "$RECORD_NAME" "$TOP_DOMAIN"
         ;;
     "zip_and_sql")
         create_wordpress_folder "$WEB_ROOT"
@@ -592,6 +593,7 @@ case "$INSTALLATION_METHOD" in
                                    "$WP_DB_NAME" "$WP_DB_USER" "$WP_DB_PASSWORD" "$MYSQL_DB_HOST" \
                                    "$WP_SOURCE_DOMAIN" "$DOMAIN"
         configure_wp_openlitespeed
+        $UPDATE_SITE_PROCESSING_SCRIPT "$RECORD_NAME" "$TOP_DOMAIN"
         ;;
     "copy")
         create_wordpress_folder "$WEB_ROOT"
@@ -600,11 +602,13 @@ case "$INSTALLATION_METHOD" in
                             "$WP_DB_NAME" "$WP_SOURCE_DB_NAME" \
                             "$MYSQL_DB_HOST" "$WP_SOURCE_DOMAIN" "$DOMAIN"
         configure_wp_openlitespeed
+        $UPDATE_SITE_PROCESSING_SCRIPT "$RECORD_NAME" "$TOP_DOMAIN"
         ;;
     "push")
         push_wordpress_site "$WP_PUSH_LOCATION" "$WEB_ROOT_SOURCE" "$WEB_ROOT" \
                           "$WP_SOURCE_DB_NAME" "$WP_DB_NAME" \
                           "$MYSQL_DB_HOST" "$WP_SOURCE_DOMAIN" "$DOMAIN"
+        $UPDATE_SITE_PROCESSING_SCRIPT "$RECORD_NAME" "$TOP_DOMAIN"
         ;;
     "maintenance")
         $WP_TOGGLE_MAINTENANCE_SCRIPT "$WP_MAINTENANCE_MODE" "$DOMAIN_FOLDER"
@@ -622,6 +626,7 @@ case "$INSTALLATION_METHOD" in
                     "$MYSQL_DB_HOST" "$MYSQL_ROOT_USER" "$MYSQL_ROOT_PASSWORD" "$WP_DB_NAME" \
                     "$WP_SOURCE_DOMAIN" "$DOMAIN"
         configure_wp_openlitespeed
+        $UPDATE_SITE_PROCESSING_SCRIPT "$RECORD_NAME" "$TOP_DOMAIN"
         ;;
     "redirect")
         $WP_REWRITE_RULES_SCRIPT "$DOMAIN_FOLDER"

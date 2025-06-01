@@ -24,6 +24,7 @@ scripts_wp=(
     "size_checker.sh"
     "toggle_vhost_suspension.sh"
     "update_used_storage.sh"
+    "update_is_processing_site.sh"
     )
 
 scripts_ftp=(
