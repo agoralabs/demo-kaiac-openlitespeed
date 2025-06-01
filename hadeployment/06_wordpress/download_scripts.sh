@@ -25,6 +25,7 @@ scripts_wp=(
     "toggle_vhost_suspension.sh"
     "update_used_storage.sh"
     "update_is_processing_site.sh"
+    "generate_all_wp_reports.sh"
     )
 
 scripts_ftp=(
