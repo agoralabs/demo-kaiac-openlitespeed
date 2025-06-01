@@ -40,7 +40,11 @@ mysql_query() {
 
 # Récupération de la liste des sites actifs
 get_active_websites() {
-    local query="SELECT domain, folder_name FROM websites WHERE is_active = 1;"
+    local query="SELECT w.record, d.domain_name, w.domain_folder 
+                 FROM websites w
+                 JOIN domains d ON w.domain_id = d.id
+                 WHERE w.is_active = 1;"
+    
     local result=$(mysql -h "$MYSQL_DB_HOST" -u "$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DB_NAME" -sse "$query" 2>/dev/null)
     
     if [ -z "$result" ]; then
@@ -48,9 +52,10 @@ get_active_websites() {
     else
         # Convertir le résultat en tableau JSON
         echo "$result" | while read -r line; do
-            domain=$(echo "$line" | awk '{print $1}')
-            folder=$(echo "$line" | awk '{print $2}')
-            echo "{\"domain\":\"$(escape_json "$domain")\",\"folder\":\"$(escape_json "$folder")\"}"
+            record=$(echo "$line" | awk '{print $1}')
+            domain=$(echo "$line" | awk '{print $2}')
+            folder=$(echo "$line" | awk '{print $3}')
+            echo "{\"record\":\"$(escape_json "$record")\",\"domain\":\"$(escape_json "$domain")\",\"folder\":\"$(escape_json "$folder")\"}"
         done | jq -s .
     fi
 }
@@ -186,8 +191,9 @@ get_wp_list_json() {
 
 # Générer un rapport complet pour un site
 generate_full_report() {
-    local domain="$1"
-    local folder="$2"
+    local record="$1"
+    local domain="$2"
+    local folder="$3"
     local site_root="$WEB_ROOT/$folder"
     local report_file="$site_root/wp-config-report.json"
     
@@ -223,7 +229,7 @@ generate_full_report() {
     # Générer le rapport complet
     {
         echo "{"
-        echo "\"domain\": \"$(escape_json "$domain")\","
+        echo "\"domain\": \"$(escape_json "$record.$domain")\","
         echo "\"folder\": \"$(escape_json "$folder")\","
         echo "\"report_date\": \"$(date -Iseconds)\","
         echo "\"web_root\": \"$(escape_json "$site_root")\","
@@ -306,11 +312,12 @@ ACTIVE_WEBSITES=$(get_active_websites)
 
 # Traiter chaque site actif
 echo "$ACTIVE_WEBSITES" | jq -c '.[]' | while read -r site; do
+    record=$(echo "$site" | jq -r '.record')
     domain=$(echo "$site" | jq -r '.domain')
     folder=$(echo "$site" | jq -r '.folder')
     
-    echo "Traitement du site: $domain (dossier: $folder)"
-    generate_full_report "$domain" "$folder"
+    echo "Traitement du site: $domain (record: $record, dossier: $folder)"
+    generate_full_report "$record" "$domain" "$folder"
 done
 
 echo "Génération des rapports terminée."
