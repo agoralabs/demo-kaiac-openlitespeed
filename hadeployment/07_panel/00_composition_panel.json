@@ -4,5 +4,6 @@
     "3": "/vagrant/demo-kaiac-openlitespeed/hadeployment/07_panel/03_bklistenerrule_backend.cfg",
     "4": "/vagrant/demo-kaiac-openlitespeed/hadeployment/07_panel/04_bktgattach_backend.cfg",
     "5": "/vagrant/demo-kaiac-openlitespeed/hadeployment/07_panel/05_bkr53exposer_backend.cfg",
-    "6": "/vagrant/demo-kaiac-openlitespeed/hadeployment/07_panel/06_cicd_nodejs_backend.cfg"
+    "6": "/vagrant/demo-kaiac-openlitespeed/hadeployment/07_panel/06_cicd_nodejs_backend.cfg",
+    "7": "/vagrant/demo-kaiac-openlitespeed/hadeployment/07_panel/07_bkcronshell_wp_report.cfg"
 }

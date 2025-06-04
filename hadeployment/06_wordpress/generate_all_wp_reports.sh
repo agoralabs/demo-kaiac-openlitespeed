@@ -1,17 +1,75 @@
 #!/bin/bash
 
 # Vérification des paramètres requis
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
-    echo "Usage: $0 [MYSQL_DB_HOST] [MYSQL_DB_NAME] [MYSQL_ROOT_USER] [MYSQL_ROOT_PASSWORD]"
-    echo "{\"error\":\"Paramètres manquants\"}" > websites_report.json
-    exit 1
-fi
+# if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+#     echo "Usage: $0 [MYSQL_DB_HOST] [MYSQL_DB_NAME] [MYSQL_ROOT_USER] [MYSQL_ROOT_PASSWORD]"
+#     echo "{\"error\":\"Paramètres manquants\"}" > websites_report.json
+#     exit 1
+# fi
 
-MYSQL_DB_HOST="$1"
-MYSQL_DB_NAME="$2"  # Nouveau paramètre pour le nom de la base de données
-MYSQL_ROOT_USER="$3"
-MYSQL_ROOT_PASSWORD="$4"
+# Fonction pour récupérer des paramètres depuis AWS Parameter Store
+# Usage: get_parameters param1 [param2 ...] [--region AWS_REGION] [--profile AWS_PROFILE]
+get_parameters_with_decryption() {
+    local params=()
+    local region=""
+    local profile=""
+    
+    # Parse les arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --region)
+                region="$2"
+                shift 2
+                ;;
+            --profile)
+                profile="$2"
+                shift 2
+                ;;
+            *)
+                params+=("$1")
+                shift
+                ;;
+        esac
+    done
+    
+    if [[ ${#params[@]} -eq 0 ]]; then
+        echo "Erreur: Aucun paramètre spécifié" >&2
+        return 1
+    fi
+    
+    local cmd="aws ssm get-parameters --names"
+    
+    for param in "${params[@]}"; do
+        cmd+=" $param"
+    done
+    
+    cmd+=" --with-decryption --query Parameters[*].Value --output text"
+    
+    if [[ -n "$region" ]]; then
+        cmd+=" --region $region"
+    fi
+    
+    if [[ -n "$profile" ]]; then
+        cmd+=" --profile $profile"
+    fi
+    
+    local result
+    result=$(eval "$cmd" 2>&1)
+    
+    if [[ $? -ne 0 ]]; then
+        echo "Erreur lors de la récupération des paramètres: $result" >&2
+        return 1
+    fi
+    
+    echo "$result"
+}
+
+MYSQL_DB_HOST=$(get_parameters_with_decryption "/kaiac/hosting/MYSQL_DB_HOST")
+MYSQL_DB_NAME=$(get_parameters_with_decryption "/kaiac/hosting/MYSQL_DB_NAME")
+MYSQL_ROOT_USER=$(get_parameters_with_decryption "/kaiac/hosting/MYSQL_ROOT_USER")
+MYSQL_ROOT_PASSWORD=$(get_parameters_with_decryption "/kaiac/hosting/MYSQL_ROOT_PASSWORD")
 WEB_ROOT="/var/www"
+
 
 # Fonction pour échapper les caractères spéciaux dans les chaînes JSON
 escape_json() {
