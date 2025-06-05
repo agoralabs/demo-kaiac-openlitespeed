@@ -7,6 +7,67 @@
 #     exit 1
 # fi
 
+# Fonction pour écrire dans le fichier de log avec timestamp
+log_message() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] [$level] $message" >> /var/log/wp-config-report.log
+}
+
+# Fonction pour initialiser le fichier de log
+init_log() {
+    local logfile="/var/log/wp-config-report.log"
+    
+    # Créer le fichier s'il n'existe pas
+    if [ ! -f "$logfile" ]; then
+        touch "$logfile"
+        chmod 644 "$logfile"
+    fi
+    
+    # Rotation du log si > 10MB
+    if [ -f "$logfile" ] && [ $(stat -f%z "$logfile") -gt 10485760 ]; then
+        mv "$logfile" "${logfile}.1"
+        touch "$logfile"
+        chmod 644 "$logfile"
+    fi
+    
+    log_message "INFO" "=== Début d'une nouvelle session de génération de rapports ==="
+}
+
+# Fonction pour logger les erreurs
+log_error() {
+    log_message "ERROR" "$1"
+}
+
+# Fonction pour logger les infos
+log_info() {
+    log_message "INFO" "$1"
+}
+
+# Fonction pour logger les avertissements
+log_warning() {
+    log_message "WARNING" "$1"
+}
+
+# Fonction pour logger les succès
+log_success() {
+    log_message "SUCCESS" "$1"
+}
+
+# Fonction pour logger les statistiques finales
+log_stats() {
+    local total="$1"
+    local success="$2"
+    local failed="$3"
+    
+    log_message "STATS" "=== Statistiques de génération ==="
+    log_message "STATS" "Total des sites traités: $total"
+    log_message "STATS" "Rapports générés avec succès: $success"
+    log_message "STATS" "Échecs de génération: $failed"
+    log_message "STATS" "=== Fin des statistiques ==="
+}
+
 # Fonction pour récupérer des paramètres depuis AWS Parameter Store
 # Usage: get_parameters param1 [param2 ...] [--region AWS_REGION] [--profile AWS_PROFILE]
 get_parameters_with_decryption() {
@@ -362,8 +423,9 @@ generate_full_report() {
     fi
 }
 
+init_log
 # Main execution
-echo "Début de la génération des rapports..."
+log_info "Début de la génération des rapports..."
 
 # Récupérer la liste des sites actifs
 ACTIVE_WEBSITES=$(get_active_websites)
@@ -374,8 +436,8 @@ echo "$ACTIVE_WEBSITES" | jq -c '.[]' | while read -r site; do
     domain=$(echo "$site" | jq -r '.domain')
     folder=$(echo "$site" | jq -r '.folder')
     
-    echo "Traitement du site: $domain (record: $record, dossier: $folder)"
+    log_info "Traitement du site: $domain (record: $record, dossier: $folder)"
     generate_full_report "$record" "$domain" "$folder"
 done
 
-echo "Génération des rapports terminée."
+log_info "Génération des rapports terminée."
